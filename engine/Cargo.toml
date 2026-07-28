@@ -1,0 +1,12 @@
+﻿[package]
+name = "findex-engine"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Findex core search engine"
+
+[lib]
+name = "findex_engine"
+
+[dependencies]
+# No external dependencies - using raw FFI for Win32 API

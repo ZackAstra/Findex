@@ -1,0 +1,13 @@
+﻿[package]
+name = "findex-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Findex command-line search tool"
+
+[[bin]]
+name = "findex"
+path = "src/main.rs"
+
+[dependencies]
+findex-engine = { path = "../engine" }
