@@ -1,5 +1,6 @@
 ﻿#![allow(non_snake_case)]
 #![allow(unused_unsafe)]
+#![allow(dead_code)]
 
 /// Findex - Graphical User Interface
 /// Windows native UI with zero external dependencies.
@@ -27,6 +28,13 @@ pub static SEARCH_OVERLAY_HWND: AtomicUsize = AtomicUsize::new(0);
 /// HWND of the settings window (for toggling from hotkey handler).
 pub static SETTINGS_HWND: AtomicUsize = AtomicUsize::new(0);
 
+/// Custom message for tray icon notifications.
+const TRAY_CALLBACK_MSG: UINT = win32::WM_APP + 1;
+
+/// Menu IDs for tray context menu
+const MENU_SHOW_SETTINGS: usize = 1001;
+const MENU_QUIT: usize = 1002;
+
 fn main() {
     unsafe {
         let hinstance = GetModuleHandleW(std::ptr::null());
@@ -36,8 +44,11 @@ fn main() {
         }
 
         // Load the index from standard locations
-        let cfg = config::Config::load();
-        load_index(&cfg);
+        settings::load_config();
+        {
+            let cfg = settings::get_config();
+            load_index(&cfg);
+        }
 
         // Register main hidden window class
         let main_class = to_wstring("FindexMainClass");
@@ -78,6 +89,9 @@ fn main() {
         SEARCH_OVERLAY_HWND.store(search.hwnd() as usize, Ordering::Relaxed);
         SETTINGS_HWND.store(settings.hwnd() as usize, Ordering::Relaxed);
 
+        // Create system tray icon
+        create_tray_icon(main_hwnd, hinstance);
+
         // Message loop
         let mut msg: MSG = std::mem::zeroed();
         while !SHOULD_QUIT.load(Ordering::Relaxed) {
@@ -86,12 +100,14 @@ fn main() {
             TranslateMessage(&msg);
             DispatchMessageW(&msg);
         }
+
+        // Remove tray icon on exit
+        remove_tray_icon(main_hwnd);
     }
 }
 
 /// Load the index from standard locations.
 fn load_index(config: &config::Config) {
-    // Start with configured paths
     let search_paths: Vec<String> = if !config.index_paths.is_empty() {
         config.index_paths.iter()
             .map(|p| format!("{}\\findex.db", p))
@@ -141,14 +157,12 @@ unsafe extern "system" fn main_wnd_proc(
                         if IsWindowVisible(overlay_hwnd) != 0 {
                             ShowWindow(overlay_hwnd, SW_HIDE);
                         } else {
-                            // Center and show
                             let screen_w = GetSystemMetrics(0);
                             let screen_h = GetSystemMetrics(1);
                             SetWindowPos(overlay_hwnd, std::ptr::null_mut(),
                                 (screen_w - 500) / 2, (screen_h - 400) / 3,
                                 500, 400, SWP_SHOWWINDOW | SWP_NOZORDER);
                             SetForegroundWindow(overlay_hwnd);
-                            // Focus the edit control
                             let edit = GetWindowLongPtrW(overlay_hwnd, 0) as HWND;
                             if !edit.is_null() {
                                 SetFocus(edit);
@@ -171,11 +185,121 @@ unsafe extern "system" fn main_wnd_proc(
             }
             0
         }
+        WM_COMMAND => {
+            let id = loword(wparam as DWORD) as usize;
+            match id {
+                MENU_SHOW_SETTINGS => {
+                    let settings_hwnd = SETTINGS_HWND.load(Ordering::Relaxed) as HWND;
+                    if !settings_hwnd.is_null() {
+                        ShowWindow(settings_hwnd, SW_SHOWNORMAL);
+                        SetForegroundWindow(settings_hwnd);
+                    }
+                }
+                MENU_QUIT => {
+                    SHOULD_QUIT.store(true, Ordering::Relaxed);
+                    PostQuitMessage(0);
+                }
+                _ => {}
+            }
+            0
+        }
+        TRAY_CALLBACK_MSG => {
+            let event = lparam as u32;
+            match event {
+                0x0203 => { // WM_LBUTTONDBLCLK
+                    let settings_hwnd = SETTINGS_HWND.load(Ordering::Relaxed) as HWND;
+                    if !settings_hwnd.is_null() {
+                        ShowWindow(settings_hwnd, SW_SHOWNORMAL);
+                        SetForegroundWindow(settings_hwnd);
+                    }
+                }
+                0x0205 => { // WM_RBUTTONUP
+                    show_tray_menu(hwnd);
+                }
+                _ => {}
+            }
+            0
+        }
         WM_DESTROY => {
+            remove_tray_icon(hwnd);
             SHOULD_QUIT.store(true, Ordering::Relaxed);
             PostQuitMessage(0);
             0
         }
         _ => DefWindowProcW(hwnd, msg, wparam, lparam),
     }
+}
+
+/// Create the system tray icon.
+unsafe fn create_tray_icon(hwnd: HWND, hinstance: HINSTANCE) {
+    let hicon = LoadIconW(hinstance, IDI_APPLICATION);
+    if hicon.is_null() {
+        let _ = LoadIconW(std::ptr::null_mut(), IDI_APPLICATION);
+    }
+
+    let mut nid = NOTIFYICONDATAW {
+        cbSize: std::mem::size_of::<NOTIFYICONDATAW>() as DWORD,
+        hWnd: hwnd,
+        uID: 1,
+        uFlags: NIF_MESSAGE | NIF_ICON | NIF_TIP,
+        uCallbackMessage: TRAY_CALLBACK_MSG,
+        hIcon: hicon,
+        szTip: [0u16; 128],
+        dwState: 0,
+        dwStateMask: 0,
+        szInfo: [0u16; 256],
+        uVersion: 0,
+        szInfoTitle: [0u16; 64],
+        dwInfoFlags: 0,
+        guidItem: [0u8; 16],
+        hBalloonIcon: std::ptr::null_mut(),
+    };
+
+    let tip = to_wstring("Findex - 文件搜索工具");
+    let tip_len = tip.len().min(127);
+    for (i, &ch) in tip[..tip_len].iter().enumerate() {
+        nid.szTip[i] = ch;
+    }
+    nid.szTip[tip_len] = 0;
+
+    Shell_NotifyIconW(NIM_ADD, &mut nid);
+}
+
+/// Remove the system tray icon.
+unsafe fn remove_tray_icon(hwnd: HWND) {
+    let mut nid = NOTIFYICONDATAW {
+        cbSize: std::mem::size_of::<NOTIFYICONDATAW>() as DWORD,
+        hWnd: hwnd,
+        uID: 1,
+        uFlags: 0,
+        uCallbackMessage: 0,
+        hIcon: std::ptr::null_mut(),
+        szTip: [0u16; 128],
+        dwState: 0,
+        dwStateMask: 0,
+        szInfo: [0u16; 256],
+        uVersion: 0,
+        szInfoTitle: [0u16; 64],
+        dwInfoFlags: 0,
+        guidItem: [0u8; 16],
+        hBalloonIcon: std::ptr::null_mut(),
+    };
+    Shell_NotifyIconW(NIM_DELETE, &mut nid);
+}
+
+/// Show the tray icon context menu.
+unsafe fn show_tray_menu(hwnd: HWND) {
+    let hmenu = CreatePopupMenu();
+    if hmenu.is_null() { return; }
+
+    AppendMenuW(hmenu, MF_STRING, MENU_SHOW_SETTINGS, to_wstring("显示设置").as_ptr());
+    AppendMenuW(hmenu, MF_SEPARATOR, 0, std::ptr::null());
+    AppendMenuW(hmenu, MF_STRING, MENU_QUIT, to_wstring("退出").as_ptr());
+
+    let mut pt = POINT { x: 0, y: 0 };
+    GetCursorPos(&mut pt);
+
+    SetForegroundWindow(hwnd);
+    TrackPopupMenu(hmenu, TPM_LEFTALIGN | TPM_RIGHTBUTTON, pt.x, pt.y, 0, hwnd, std::ptr::null_mut());
+    DestroyMenu(hmenu);
 }

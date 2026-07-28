@@ -144,6 +144,47 @@ pub const WM_PRINT: UINT = 0x0317;
 pub const WM_PRINTCLIENT: UINT = 0x0318;
 pub const WM_STYLECHANGED: UINT = 0x007D;
 pub const WM_THEMECHANGED: UINT = 0x031A;
+
+// Custom window messages
+pub const WM_APP: UINT = 0x8000;
+
+// NOTIFYICONDATA constants
+pub const NIM_ADD: UINT = 0;
+pub const NIM_MODIFY: UINT = 1;
+pub const NIM_DELETE: UINT = 2;
+pub const NIF_MESSAGE: UINT = 0x00000001;
+pub const NIF_ICON: UINT = 0x00000002;
+pub const NIF_TIP: UINT = 0x00000004;
+
+// NOTIFYICONDATA struct
+#[repr(C)]
+pub struct NOTIFYICONDATAW {
+    pub cbSize: DWORD,
+    pub hWnd: HWND,
+    pub uID: UINT,
+    pub uFlags: UINT,
+    pub uCallbackMessage: UINT,
+    pub hIcon: HICON,
+    pub szTip: [u16; 128],
+    pub dwState: DWORD,
+    pub dwStateMask: DWORD,
+    pub szInfo: [u16; 256],
+    pub uVersion: UINT,
+    pub szInfoTitle: [u16; 64],
+    pub dwInfoFlags: DWORD,
+    pub guidItem: [u8; 16],
+    pub hBalloonIcon: HICON,
+}
+
+// Menu constants
+pub const MF_STRING: UINT = 0x00000000;
+pub const MF_POPUP: UINT = 0x00000010;
+pub const MF_SEPARATOR: UINT = 0x00000800;
+
+// TrackPopupMenu flags
+pub const TPM_LEFTALIGN: UINT = 0x0000;
+pub const TPM_RIGHTBUTTON: UINT = 0x0002;
+
 pub const WM_USER: UINT = 0x0400;
 
 // SYSCOMMAND IDs
@@ -815,7 +856,12 @@ extern "system" {
 
     pub fn SHBrowseForFolderW(lpbi: *mut BROWSEINFOW) -> LPVOID;
     pub fn SHGetPathFromIDListW(pidl: LPVOID, pszPath: LPWSTR) -> BOOL;
-    pub fn CoTaskMemFree(pv: LPVOID);
+    pub fn Shell_NotifyIconW(dwMessage: DWORD, lpdata: *mut NOTIFYICONDATAW) -> BOOL;
+    pub fn CreatePopupMenu() -> HMENU;
+    pub fn AppendMenuW(hMenu: HMENU, uFlags: UINT, uIDNewItem: usize, lpNewItem: LPCWSTR) -> BOOL;
+    pub fn TrackPopupMenu(hMenu: HMENU, uFlags: UINT, x: i32, y: i32, nReserved: i32, hWnd: HWND, prcRect: LPVOID) -> BOOL;
+    pub fn DestroyMenu(hMenu: HMENU) -> BOOL;
+    pub fn GetMenuItemCount(hMenu: HMENU) -> i32;    pub fn CoTaskMemFree(pv: LPVOID);
     pub fn CallWindowProcW(lpPrevWndFunc: LPVOID, hWnd: HWND, Msg: UINT, wParam: WPARAM, lParam: LPARAM) -> LRESULT;
 }
 
