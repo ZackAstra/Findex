@@ -40,12 +40,9 @@ fn main() {
             return;
         }
 
-        // Load the index from standard locations
+        // Load or build the index
         config::load_config();
-        {
-            let cfg = config::get_config();
-            load_index(&cfg);
-        }
+        load_or_build_index();
 
         // Register main hidden window class
         let main_class = to_wstring("FindexMainClass");
@@ -124,42 +121,95 @@ pub fn re_register_hotkeys() {
     }
 }
 
-/// Load the index from standard locations.
-fn load_index(config: &config::Config) {
-    let search_paths: Vec<String> = if !config.index_paths.is_empty() {
-        config.index_paths.iter()
-            .map(|p| format!("{}\\findex.db", p))
-            .collect()
-    } else {
-        vec![
-            "findex.db".to_string(),
-            {
-                let appdata = std::env::var("APPDATA").unwrap_or_default();
-                if !appdata.is_empty() {
-                    format!("{}\\Findex\\index.db", appdata)
-                } else {
-                    String::new()
-                }
-            },
-        ]
-    };
+/// Get the canonical index path in %APPDATA%\Findex\index.db.
+fn get_index_path() -> Option<String> {
+    let appdata = std::env::var("APPDATA").ok()?;
+    let dir = format!("{}\\Findex", appdata);
+    let _ = std::fs::create_dir_all(&dir);
+    Some(format!("{}\\index.db", dir))
+}
 
-    for path in &search_paths {
-        if path.is_empty() { continue; }
-        if let Ok(storage) = findex_engine::Storage::open(path) {
+/// Load existing index or auto-build one on first launch.
+fn load_or_build_index() {
+    // 1. Try loading from the canonical AppData path
+    if let Some(index_path) = get_index_path() {
+        if let Ok(storage) = findex_engine::Storage::open(&index_path) {
             if let Ok(entries) = storage.load_entries() {
                 if !entries.is_empty() {
                     let mut index = findex_engine::TrieIndex::new();
                     index.load_entries(entries);
                     let searcher = findex_engine::Searcher::new(index);
                     *SEARCHER.lock().unwrap() = Some(searcher);
-                    eprintln!("Loaded index from {}: {} entries", path, storage.entry_count().unwrap_or(0));
+                    eprintln!("Loaded index from {}: {} entries", index_path, storage.entry_count().unwrap_or(0));
                     return;
                 }
             }
         }
     }
-    eprintln!("No index found. Use 'findex index <directory>' to create one.");
+
+    // 2. No existing index found — auto-detect drives and build one
+    eprintln!("No existing index found. Auto-building index from available drives...");
+    auto_build_index();
+}
+
+/// Detect available fixed drives and build the index automatically.
+fn auto_build_index() {
+    let drives = detect_fixed_drives();
+    if drives.is_empty() {
+        eprintln!("No drives found for indexing");
+        return;
+    }
+
+    let excludes: Vec<String> = config::get_config().exclude_patterns.clone();
+    let mut all_entries = Vec::new();
+
+    for drive in &drives {
+        eprintln!("Indexing {} ...", drive);
+        let path = std::path::Path::new(drive);
+        if let Ok(entries) = findex_engine::FsWalker::walk_with_excludes(path, 0, &excludes) {
+            all_entries.extend(entries);
+        }
+    }
+
+    // Deduplicate by path
+    let mut seen = std::collections::HashSet::new();
+    all_entries.retain(|e| seen.insert(e.path.clone()));
+
+    if !all_entries.is_empty() {
+        let mut index = findex_engine::TrieIndex::new();
+        index.load_entries(all_entries);
+        let searcher = findex_engine::Searcher::new(index);
+
+        // Save to AppData for subsequent launches
+        if let Some(index_path) = get_index_path() {
+            if let Ok(storage) = findex_engine::Storage::open(&index_path) {
+                let entries = searcher.index().all_entries();
+                if let Err(e) = storage.save_entries(&entries) {
+                    eprintln!("Failed to save index: {}", e);
+                } else {
+                    eprintln!("Saved index to {}: {} entries", index_path, entries.len());
+                }
+            }
+        }
+
+        let status = searcher.status();
+        *SEARCHER.lock().unwrap() = Some(searcher);
+        eprintln!("Index built: {} files, {} folders on {}", status.total_files, status.total_folders, drives.join(", "));
+    } else {
+        eprintln!("No files found during auto-indexing");
+    }
+}
+
+/// Detect available fixed drives on the system (C:, D:, etc.).
+fn detect_fixed_drives() -> Vec<String> {
+    let mut drives = Vec::new();
+    for letter in 'C'..='Z' {
+        let path = format!("{}:\\", letter);
+        if std::path::Path::new(&path).exists() {
+            drives.push(path);
+        }
+    }
+    drives
 }
 
 unsafe extern "system" fn main_wnd_proc(

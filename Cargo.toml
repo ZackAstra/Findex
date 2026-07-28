@@ -3,7 +3,8 @@ resolver = "2"
 members = ["engine", "cli", "ui"]
 
 [workspace.package]
-version = "0.1.8"
+version = "0.1.9"
 edition = "2021"
 license = "MIT"
 description = "Findex - Fast Windows file search tool"
+
