@@ -28,3 +28,6 @@ tests/
 scripts/*.zip
 scripts/*.exe
 dlltool.exe
+
+# Development plan (local tracking)
+DEVELOPMENT_PLAN.md

@@ -5,6 +5,7 @@
 /// Windows native UI with zero external dependencies.
 
 mod win32;
+mod config;
 mod settings;
 mod search_overlay;
 
@@ -35,7 +36,8 @@ fn main() {
         }
 
         // Load the index from standard locations
-        load_index();
+        let cfg = config::Config::load();
+        load_index(&cfg);
 
         // Register main hidden window class
         let main_class = to_wstring("FindexMainClass");
@@ -88,20 +90,27 @@ fn main() {
 }
 
 /// Load the index from standard locations.
-fn load_index() {
-    let paths = [
-        "findex.db".to_string(),
-        {
-            let appdata = std::env::var("APPDATA").unwrap_or_default();
-            if !appdata.is_empty() {
-                format!("{}\\Findex\\index.db", appdata)
-            } else {
-                String::new()
-            }
-        },
-    ];
+fn load_index(config: &config::Config) {
+    // Start with configured paths
+    let search_paths: Vec<String> = if !config.index_paths.is_empty() {
+        config.index_paths.iter()
+            .map(|p| format!("{}\\findex.db", p))
+            .collect()
+    } else {
+        vec![
+            "findex.db".to_string(),
+            {
+                let appdata = std::env::var("APPDATA").unwrap_or_default();
+                if !appdata.is_empty() {
+                    format!("{}\\Findex\\index.db", appdata)
+                } else {
+                    String::new()
+                }
+            },
+        ]
+    };
 
-    for path in paths.iter() {
+    for path in &search_paths {
         if path.is_empty() { continue; }
         if let Ok(storage) = findex_engine::Storage::open(path) {
             if let Ok(entries) = storage.load_entries() {

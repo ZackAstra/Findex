@@ -316,6 +316,10 @@ pub const LBS_DISABLENOSCROLL: DWORD = 0x00001000;
 pub const LBS_NODATA: DWORD = 0x00002000;
 pub const LBS_STANDARD: DWORD = LBS_NOTIFY | LBS_SORT | WS_VSCROLL | WS_BORDER;
 
+// Button messages
+pub const BM_GETCHECK: UINT = 0x00F0;
+pub const BM_SETCHECK: UINT = 0x00F1;
+
 // ListBox Messages
 pub const LB_ADDSTRING: UINT = 0x0180;
 pub const LB_INSERTSTRING: UINT = 0x0181;
@@ -697,6 +701,7 @@ extern "system" {
     pub fn ShowWindow(hWnd: HWND, nCmdShow: i32) -> BOOL;
     pub fn UpdateWindow(hWnd: HWND) -> BOOL;
     pub fn SetWindowTextW(hWnd: HWND, lpString: LPCWSTR) -> BOOL;
+    pub fn GetDlgItem(hDlg: HWND, nIDDlgItem: i32) -> HWND;
     pub fn GetWindowTextW(hWnd: HWND, lpString: LPWSTR, nMaxCount: i32) -> i32;
     pub fn GetWindowTextLengthW(hWnd: HWND) -> i32;
     pub fn EnableWindow(hWnd: HWND, bEnable: BOOL) -> BOOL;
@@ -807,6 +812,10 @@ extern "system" {
     pub fn GlobalFree(hMem: HANDLE) -> HANDLE;
     pub fn ShellExecuteW(hwnd: HWND, lpOperation: LPCWSTR, lpFile: LPCWSTR, lpParameters: LPCWSTR, lpDirectory: LPCWSTR, nShowCmd: i32) -> HINSTANCE;
     pub fn GetModuleFileNameW(hModule: HINSTANCE, lpFilename: LPWSTR, nSize: DWORD) -> DWORD;
+
+    pub fn SHBrowseForFolderW(lpbi: *mut BROWSEINFOW) -> LPVOID;
+    pub fn SHGetPathFromIDListW(pidl: LPVOID, pszPath: LPWSTR) -> BOOL;
+    pub fn CoTaskMemFree(pv: LPVOID);
     pub fn CallWindowProcW(lpPrevWndFunc: LPVOID, hWnd: HWND, Msg: UINT, wParam: WPARAM, lParam: LPARAM) -> LRESULT;
 }
 
@@ -841,6 +850,27 @@ pub fn hiword(l: DWORD) -> WORD { (l >> 16) as WORD }
 pub fn loword(l: DWORD) -> WORD { l as WORD }
 
 pub const WM_SETFONT: UINT = 0x0030;
+
+
+// Browse for folder
+#[repr(C)]
+pub struct BROWSEINFOW {
+    pub hwndOwner: HWND,
+    pub pidlRoot: LPVOID,
+    pub pszDisplayName: LPWSTR,
+    pub lpszTitle: LPCWSTR,
+    pub ulFlags: UINT,
+    pub lpfn: LPVOID,
+    pub lParam: LPARAM,
+    pub iImage: i32,
+}
+
+// BIF flags
+pub const BIF_RETURNONLYFSDIRS: UINT = 0x0001;
+pub const BIF_DONTGOBELOWDOMAIN: UINT = 0x0002;
+pub const BIF_NEWDIALOGSTYLE: UINT = 0x0040;
+pub const BIF_EDITBOX: UINT = 0x0010;
+pub const BIF_USENEWUI: UINT = BIF_NEWDIALOGSTYLE | BIF_EDITBOX;
 
 // GWLP indices for SetWindowLongPtrW / GetWindowLongPtrW
 pub const GWLP_WNDPROC: i32 = -4;

@@ -1,4 +1,4 @@
-﻿/// Findex Search Floating Overlay Window
+﻿#![allow(dead_code)]
 /// A borderless, always-on-top search window that appears on hotkey.
 /// Connected to the global engine Searcher for real-time file search.
 
