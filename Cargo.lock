@@ -12,3 +12,10 @@ dependencies = [
 [[package]]
 name = "findex-engine"
 version = "0.0.1"
+
+[[package]]
+name = "findex-ui"
+version = "0.0.1"
+dependencies = [
+ "findex-engine",
+]
