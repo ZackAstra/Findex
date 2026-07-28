@@ -22,3 +22,9 @@ target/
 
 # Database
 *.db
+
+# Scratch files
+tests/
+scripts/*.zip
+scripts/*.exe
+dlltool.exe
