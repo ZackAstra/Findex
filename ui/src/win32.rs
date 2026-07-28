@@ -807,6 +807,7 @@ extern "system" {
     pub fn GlobalFree(hMem: HANDLE) -> HANDLE;
     pub fn ShellExecuteW(hwnd: HWND, lpOperation: LPCWSTR, lpFile: LPCWSTR, lpParameters: LPCWSTR, lpDirectory: LPCWSTR, nShowCmd: i32) -> HINSTANCE;
     pub fn GetModuleFileNameW(hModule: HINSTANCE, lpFilename: LPWSTR, nSize: DWORD) -> DWORD;
+    pub fn CallWindowProcW(lpPrevWndFunc: LPVOID, hWnd: HWND, Msg: UINT, wParam: WPARAM, lParam: LPARAM) -> LRESULT;
 }
 
 pub type HOOKPROC = unsafe extern "system" fn(i32, WPARAM, LPARAM) -> LRESULT;
@@ -840,5 +841,10 @@ pub fn hiword(l: DWORD) -> WORD { (l >> 16) as WORD }
 pub fn loword(l: DWORD) -> WORD { l as WORD }
 
 pub const WM_SETFONT: UINT = 0x0030;
+
+// GWLP indices for SetWindowLongPtrW / GetWindowLongPtrW
+pub const GWLP_WNDPROC: i32 = -4;
+pub const GWLP_USERDATA: i32 = -21;
+
 
 

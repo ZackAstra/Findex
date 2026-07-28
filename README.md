@@ -99,6 +99,14 @@ findex/
 
 ## 📋 Changelog
 
+
+### v0.1.1 (2026-07-28)
+- ✨ **搜索浮窗连接引擎**: Ctrl+Space 呼出后输入文字实时搜索已索引文件
+- ✨ **键盘导航**: ↑↓ 选择结果，Enter 打开文件，Esc 关闭浮窗
+- ✨ **双击开文件**: 结果列表双击直接打开文件
+- 🔧 **设置窗口默认隐藏**: 启动时不显示，按 Ctrl+Shift+F 呼出
+- 🔧 **自动加载索引**: 启动时从当前目录或 %%APPDATA%%/Findex/index.db 加载
+
 ### v0.1.0 (2026-07-27)
 - ✨ **新增: 图形界面 (findex-ui)**
   - 设置窗口：索引目录管理、快捷键配置、搜索选项
@@ -124,3 +132,4 @@ Issues and PRs are welcome! See [docs/](docs/) for development documentation.
 ## 📄 License
 
 MIT
+

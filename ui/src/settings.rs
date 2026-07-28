@@ -11,6 +11,10 @@ impl SettingsWindow {
         SettingsWindow { hwnd: std::ptr::null_mut(), hinstance }
     }
 
+    pub fn hwnd(&self) -> HWND {
+        self.hwnd
+    }
+
     pub fn create(&mut self) -> HWND {
         let class_name = to_wstring("FindexSettingsClass");
 
@@ -35,7 +39,7 @@ impl SettingsWindow {
         let hwnd = unsafe {
             CreateWindowExW(
                 0, class_name.as_ptr(), window_name.as_ptr(),
-                WS_OVERLAPPEDWINDOW | WS_VISIBLE,
+                WS_OVERLAPPEDWINDOW,
                 200, 200, 520, 420,
                 std::ptr::null_mut(), std::ptr::null_mut(), self.hinstance, std::ptr::null_mut()
             )

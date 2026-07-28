@@ -12,20 +12,19 @@ use win32::*;
 use settings::SettingsWindow;
 use search_overlay::SearchOverlay;
 
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Mutex;
 
 static SHOULD_QUIT: AtomicBool = AtomicBool::new(false);
 
-struct AppState {
-    settings_created: bool,
-    search_created: bool,
-    main_hwnd: win32::HWND,
-}
+/// Global searcher instance, shared between main window and search overlay.
+pub static SEARCHER: Mutex<Option<findex_engine::Searcher>> = Mutex::new(None);
 
-unsafe impl Send for AppState {}
+/// HWND of the search overlay window (for toggling from hotkey handler).
+pub static SEARCH_OVERLAY_HWND: AtomicUsize = AtomicUsize::new(0);
 
-static APP_STATE: Mutex<Option<AppState>> = Mutex::new(None);
+/// HWND of the settings window (for toggling from hotkey handler).
+pub static SETTINGS_HWND: AtomicUsize = AtomicUsize::new(0);
 
 fn main() {
     unsafe {
@@ -35,6 +34,10 @@ fn main() {
             return;
         }
 
+        // Load the index from standard locations
+        load_index();
+
+        // Register main hidden window class
         let main_class = to_wstring("FindexMainClass");
         let wc = WNDCLASSEXW {
             cbSize: std::mem::size_of::<WNDCLASSEXW>() as UINT,
@@ -58,25 +61,22 @@ fn main() {
             std::ptr::null_mut(), std::ptr::null_mut(), hinstance, std::ptr::null_mut(),
         );
 
+        // Register global hotkeys
         RegisterHotKey(main_hwnd, 1, MOD_CONTROL, VK_SPACE as UINT);
         RegisterHotKey(main_hwnd, 2, MOD_CONTROL | MOD_SHIFT, 'F' as UINT);
 
-        let mut settings = SettingsWindow::new(hinstance);
-        settings.create();
-        settings.show();
+        // Create settings window (hidden by default)
+        let settings = SettingsWindow::new(hinstance);
 
+        // Create search overlay
         let mut search = SearchOverlay::new(hinstance);
         search.create();
 
-        {
-            let mut state = APP_STATE.lock().unwrap();
-            *state = Some(AppState {
-                settings_created: true,
-                search_created: true,
-                main_hwnd,
-            });
-        }
+        // Store HWNDs in globals for hotkey access
+        SEARCH_OVERLAY_HWND.store(search.hwnd() as usize, Ordering::Relaxed);
+        SETTINGS_HWND.store(settings.hwnd() as usize, Ordering::Relaxed);
 
+        // Message loop
         let mut msg: MSG = std::mem::zeroed();
         while !SHOULD_QUIT.load(Ordering::Relaxed) {
             let ret = GetMessageW(&mut msg, std::ptr::null_mut(), 0, 0);
@@ -87,16 +87,78 @@ fn main() {
     }
 }
 
+/// Load the index from standard locations.
+fn load_index() {
+    let paths = [
+        "findex.db".to_string(),
+        {
+            let appdata = std::env::var("APPDATA").unwrap_or_default();
+            if !appdata.is_empty() {
+                format!("{}\\Findex\\index.db", appdata)
+            } else {
+                String::new()
+            }
+        },
+    ];
+
+    for path in paths.iter() {
+        if path.is_empty() { continue; }
+        if let Ok(storage) = findex_engine::Storage::open(path) {
+            if let Ok(entries) = storage.load_entries() {
+                if !entries.is_empty() {
+                    let mut index = findex_engine::TrieIndex::new();
+                    index.load_entries(entries);
+                    let searcher = findex_engine::Searcher::new(index);
+                    *SEARCHER.lock().unwrap() = Some(searcher);
+                    eprintln!("Loaded index from {}: {} entries", path, storage.entry_count().unwrap_or(0));
+                    return;
+                }
+            }
+        }
+    }
+    eprintln!("No index found. Use 'findex index <directory>' to create one.");
+}
+
 unsafe extern "system" fn main_wnd_proc(
     hwnd: HWND, msg: UINT, wparam: WPARAM, lparam: LPARAM,
 ) -> LRESULT {
     match msg {
         WM_HOTKEY => {
             let id = wparam as i32;
-            if id == 1 {
-                // Toggle search - TODO
-            } else if id == 2 {
-                // Show settings - TODO
+            match id {
+                1 => { // Ctrl+Space: toggle search overlay
+                    let overlay_hwnd = SEARCH_OVERLAY_HWND.load(Ordering::Relaxed) as HWND;
+                    if !overlay_hwnd.is_null() {
+                        if IsWindowVisible(overlay_hwnd) != 0 {
+                            ShowWindow(overlay_hwnd, SW_HIDE);
+                        } else {
+                            // Center and show
+                            let screen_w = GetSystemMetrics(0);
+                            let screen_h = GetSystemMetrics(1);
+                            SetWindowPos(overlay_hwnd, std::ptr::null_mut(),
+                                (screen_w - 500) / 2, (screen_h - 400) / 3,
+                                500, 400, SWP_SHOWWINDOW | SWP_NOZORDER);
+                            SetForegroundWindow(overlay_hwnd);
+                            // Focus the edit control
+                            let edit = GetWindowLongPtrW(overlay_hwnd, 0) as HWND;
+                            if !edit.is_null() {
+                                SetFocus(edit);
+                            }
+                        }
+                    }
+                }
+                2 => { // Ctrl+Shift+F: toggle settings window
+                    let settings_hwnd = SETTINGS_HWND.load(Ordering::Relaxed) as HWND;
+                    if !settings_hwnd.is_null() {
+                        if IsWindowVisible(settings_hwnd) != 0 {
+                            ShowWindow(settings_hwnd, SW_HIDE);
+                        } else {
+                            ShowWindow(settings_hwnd, SW_SHOWNORMAL);
+                            SetForegroundWindow(settings_hwnd);
+                        }
+                    }
+                }
+                _ => {}
             }
             0
         }
