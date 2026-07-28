@@ -629,6 +629,7 @@ pub struct WNDCLASSEXW {
 }
 
 #[repr(C)]
+#[repr(C)]
 pub struct PAINTSTRUCT {
     pub hdc: HDC,
     pub fErase: BOOL,
@@ -637,6 +638,31 @@ pub struct PAINTSTRUCT {
     pub fIncUpdate: BOOL,
     pub rgbReserved: [u8; 32],
 }
+
+// Bitmap info
+#[repr(C)]
+pub struct BITMAPINFOHEADER {
+    pub biSize: DWORD,
+    pub biWidth: i32,
+    pub biHeight: i32,
+    pub biPlanes: WORD,
+    pub biBitCount: WORD,
+    pub biCompression: DWORD,
+    pub biSizeImage: DWORD,
+    pub biXPelsPerMeter: i32,
+    pub biYPelsPerMeter: i32,
+    pub biClrUsed: DWORD,
+    pub biClrImportant: DWORD,
+}
+
+#[repr(C)]
+pub struct BITMAPINFO {
+    pub bmiHeader: BITMAPINFOHEADER,
+    pub bmiColors: [DWORD; 1],
+}
+
+pub const BI_RGB: DWORD = 0;
+pub const DIB_RGB_COLORS: UINT = 0;
 
 #[repr(C)]
 pub struct CREATESTRUCTW {
@@ -852,6 +878,7 @@ extern "system" {
     pub fn GlobalUnlock(hMem: HANDLE) -> BOOL;
     pub fn GlobalFree(hMem: HANDLE) -> HANDLE;
     pub fn ShellExecuteW(hwnd: HWND, lpOperation: LPCWSTR, lpFile: LPCWSTR, lpParameters: LPCWSTR, lpDirectory: LPCWSTR, nShowCmd: i32) -> HINSTANCE;
+    pub fn StretchDIBits(hdc: HDC, xDest: i32, yDest: i32, wDest: i32, hDest: i32, xSrc: i32, ySrc: i32, wSrc: i32, hSrc: i32, lpBits: LPCVOID, lpbmi: *const BITMAPINFO, iUsage: UINT, dwRop: DWORD) -> i32;
     pub fn GetModuleFileNameW(hModule: HINSTANCE, lpFilename: LPWSTR, nSize: DWORD) -> DWORD;
 
     pub fn SHBrowseForFolderW(lpbi: *mut BROWSEINFOW) -> LPVOID;
@@ -921,6 +948,4 @@ pub const BIF_USENEWUI: UINT = BIF_NEWDIALOGSTYLE | BIF_EDITBOX;
 // GWLP indices for SetWindowLongPtrW / GetWindowLongPtrW
 pub const GWLP_WNDPROC: i32 = -4;
 pub const GWLP_USERDATA: i32 = -21;
-
-
 

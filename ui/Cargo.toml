@@ -7,3 +7,5 @@ description = "Findex graphical user interface"
 
 [dependencies]
 findex-engine = { path = "../engine" }
+egui = "0.27"
+epaint = "0.27"

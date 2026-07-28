@@ -3,12 +3,14 @@
 #![allow(dead_code)]
 
 /// Findex - Graphical User Interface
-/// Windows native UI with zero external dependencies.
+/// Windows native UI with egui rendering.
 
 mod win32;
 mod config;
 mod settings;
 mod search_overlay;
+mod egui_win32;
+mod egui_windows;
 
 use win32::*;
 use settings::SettingsWindow;
@@ -78,15 +80,10 @@ fn main() {
         RegisterHotKey(main_hwnd, 1, MOD_CONTROL, VK_SPACE as UINT);
         RegisterHotKey(main_hwnd, 2, MOD_CONTROL | MOD_SHIFT, 'F' as UINT);
 
-        // Create settings window (hidden by default)
+        // Create settings window (hidden by default, using old Win32 for now)
         let settings = SettingsWindow::new(hinstance);
 
-        // Create search overlay
-        let mut search = SearchOverlay::new(hinstance);
-        search.create();
-
-        // Store HWNDs in globals for hotkey access
-        SEARCH_OVERLAY_HWND.store(search.hwnd() as usize, Ordering::Relaxed);
+        // Store HWND for settings
         SETTINGS_HWND.store(settings.hwnd() as usize, Ordering::Relaxed);
 
         // Create system tray icon
@@ -151,24 +148,9 @@ unsafe extern "system" fn main_wnd_proc(
         WM_HOTKEY => {
             let id = wparam as i32;
             match id {
-                1 => { // Ctrl+Space: toggle search overlay
-                    let overlay_hwnd = SEARCH_OVERLAY_HWND.load(Ordering::Relaxed) as HWND;
-                    if !overlay_hwnd.is_null() {
-                        if IsWindowVisible(overlay_hwnd) != 0 {
-                            ShowWindow(overlay_hwnd, SW_HIDE);
-                        } else {
-                            let screen_w = GetSystemMetrics(0);
-                            let screen_h = GetSystemMetrics(1);
-                            SetWindowPos(overlay_hwnd, std::ptr::null_mut(),
-                                (screen_w - 500) / 2, (screen_h - 400) / 3,
-                                500, 400, SWP_SHOWWINDOW | SWP_NOZORDER);
-                            SetForegroundWindow(overlay_hwnd);
-                            let edit = GetWindowLongPtrW(overlay_hwnd, 0) as HWND;
-                            if !edit.is_null() {
-                                SetFocus(edit);
-                            }
-                        }
-                    }
+                1 => { // Ctrl+Space: show egui search overlay
+                    let hinstance = GetModuleHandleW(std::ptr::null());
+                    egui_windows::run_search_overlay(hinstance);
                 }
                 2 => { // Ctrl+Shift+F: toggle settings window
                     let settings_hwnd = SETTINGS_HWND.load(Ordering::Relaxed) as HWND;
