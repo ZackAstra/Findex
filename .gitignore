@@ -31,3 +31,9 @@ dlltool.exe
 
 # Development plan (local tracking)
 DEVELOPMENT_PLAN.md
+
+# dlltool stub (build toolchain fix)
+scripts/dlltool.rs
+scripts/dlltool.exe
+scripts/*.o
+scripts/*.log
