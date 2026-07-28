@@ -31,6 +31,7 @@ pub type HGDIOBJ = HANDLE;
 pub type HHOOK = HANDLE;
 pub type HACCEL = HANDLE;
 pub type HRAWINPUT = HANDLE;
+pub type HRGN = HANDLE;
 pub type LPARAM_D = isize;
 pub type LPCWSTR = *const u16;
 pub type LPWSTR = *mut u16;
@@ -890,6 +891,8 @@ extern "system" {
     pub fn DestroyMenu(hMenu: HMENU) -> BOOL;
     pub fn GetMenuItemCount(hMenu: HMENU) -> i32;    pub fn CoTaskMemFree(pv: LPVOID);
     pub fn CallWindowProcW(lpPrevWndFunc: LPVOID, hWnd: HWND, Msg: UINT, wParam: WPARAM, lParam: LPARAM) -> LRESULT;
+    pub fn SetWindowRgn(hWnd: HWND, hRgn: HRGN, bRedraw: BOOL) -> i32;
+    pub fn CreateRoundRectRgn(x1: i32, y1: i32, x2: i32, y2: i32, w: i32, h: i32) -> HRGN;
 }
 
 pub type HOOKPROC = unsafe extern "system" fn(i32, WPARAM, LPARAM) -> LRESULT;
@@ -948,4 +951,6 @@ pub const BIF_USENEWUI: UINT = BIF_NEWDIALOGSTYLE | BIF_EDITBOX;
 // GWLP indices for SetWindowLongPtrW / GetWindowLongPtrW
 pub const GWLP_WNDPROC: i32 = -4;
 pub const GWLP_USERDATA: i32 = -21;
+
+
 

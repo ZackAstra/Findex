@@ -7,14 +7,10 @@
 
 mod win32;
 mod config;
-mod settings;
-mod search_overlay;
 mod egui_win32;
 mod egui_windows;
 
 use win32::*;
-use settings::SettingsWindow;
-use search_overlay::SearchOverlay;
 
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Mutex;
@@ -24,14 +20,13 @@ static SHOULD_QUIT: AtomicBool = AtomicBool::new(false);
 /// Global searcher instance, shared between main window and search overlay.
 pub static SEARCHER: Mutex<Option<findex_engine::Searcher>> = Mutex::new(None);
 
-/// HWND of the search overlay window (for toggling from hotkey handler).
-pub static SEARCH_OVERLAY_HWND: AtomicUsize = AtomicUsize::new(0);
-
-/// HWND of the settings window (for toggling from hotkey handler).
-pub static SETTINGS_HWND: AtomicUsize = AtomicUsize::new(0);
+/// Main hidden window handle for hotkey registration.
+static MAIN_HWND: AtomicUsize = AtomicUsize::new(0);
 
 /// Custom message for tray icon notifications.
 const TRAY_CALLBACK_MSG: UINT = win32::WM_APP + 1;
+const HOTKEY_ID_SEARCH: i32 = 1;
+const HOTKEY_ID_SETTINGS: i32 = 2;
 
 /// Menu IDs for tray context menu
 const MENU_SHOW_SETTINGS: usize = 1001;
@@ -46,9 +41,9 @@ fn main() {
         }
 
         // Load the index from standard locations
-        settings::load_config();
+        config::load_config();
         {
-            let cfg = settings::get_config();
+            let cfg = config::get_config();
             load_index(&cfg);
         }
 
@@ -76,15 +71,10 @@ fn main() {
             std::ptr::null_mut(), std::ptr::null_mut(), hinstance, std::ptr::null_mut(),
         );
 
-        // Register global hotkeys
-        RegisterHotKey(main_hwnd, 1, MOD_CONTROL, VK_SPACE as UINT);
-        RegisterHotKey(main_hwnd, 2, MOD_CONTROL | MOD_SHIFT, 'F' as UINT);
+        MAIN_HWND.store(main_hwnd as usize, Ordering::Relaxed);
 
-        // Create settings window (hidden by default, using old Win32 for now)
-        let settings = SettingsWindow::new(hinstance);
-
-        // Store HWND for settings
-        SETTINGS_HWND.store(settings.hwnd() as usize, Ordering::Relaxed);
+        // Register global hotkeys from config
+        register_hotkeys(main_hwnd);
 
         // Create system tray icon
         create_tray_icon(main_hwnd, hinstance);
@@ -100,6 +90,37 @@ fn main() {
 
         // Remove tray icon on exit
         remove_tray_icon(main_hwnd);
+    }
+}
+
+/// Register hotkeys from the current config.
+unsafe fn register_hotkeys(hwnd: HWND) {
+    let cfg = config::get_config();
+
+    // Unregister old hotkeys first
+    UnregisterHotKey(hwnd, HOTKEY_ID_SEARCH);
+    UnregisterHotKey(hwnd, HOTKEY_ID_SETTINGS);
+
+    // Register search hotkey
+    if let Some((mods, vk)) = config::parse_hotkey(&cfg.hotkey_search) {
+        RegisterHotKey(hwnd, HOTKEY_ID_SEARCH, mods, vk);
+        eprintln!("Search hotkey: {}", cfg.hotkey_search);
+    }
+
+    // Register settings hotkey
+    if let Some((mods, vk)) = config::parse_hotkey(&cfg.hotkey_settings) {
+        RegisterHotKey(hwnd, HOTKEY_ID_SETTINGS, mods, vk);
+        eprintln!("Settings hotkey: {}", cfg.hotkey_settings);
+    }
+}
+
+/// Re-register hotkeys (called after config save).
+pub fn re_register_hotkeys() {
+    unsafe {
+        let hwnd = MAIN_HWND.load(Ordering::Relaxed) as HWND;
+        if !hwnd.is_null() {
+            register_hotkeys(hwnd);
+        }
     }
 }
 
@@ -148,20 +169,12 @@ unsafe extern "system" fn main_wnd_proc(
         WM_HOTKEY => {
             let id = wparam as i32;
             match id {
-                1 => { // Ctrl+Space: show egui search overlay
+                HOTKEY_ID_SEARCH => {
                     let hinstance = GetModuleHandleW(std::ptr::null());
                     egui_windows::run_search_overlay(hinstance);
                 }
-                2 => { // Ctrl+Shift+F: toggle settings window
-                    let settings_hwnd = SETTINGS_HWND.load(Ordering::Relaxed) as HWND;
-                    if !settings_hwnd.is_null() {
-                        if IsWindowVisible(settings_hwnd) != 0 {
-                            ShowWindow(settings_hwnd, SW_HIDE);
-                        } else {
-                            ShowWindow(settings_hwnd, SW_SHOWNORMAL);
-                            SetForegroundWindow(settings_hwnd);
-                        }
-                    }
+                HOTKEY_ID_SETTINGS => {
+                    run_settings();
                 }
                 _ => {}
             }
@@ -171,11 +184,7 @@ unsafe extern "system" fn main_wnd_proc(
             let id = loword(wparam as DWORD) as usize;
             match id {
                 MENU_SHOW_SETTINGS => {
-                    let settings_hwnd = SETTINGS_HWND.load(Ordering::Relaxed) as HWND;
-                    if !settings_hwnd.is_null() {
-                        ShowWindow(settings_hwnd, SW_SHOWNORMAL);
-                        SetForegroundWindow(settings_hwnd);
-                    }
+                    run_settings();
                 }
                 MENU_QUIT => {
                     SHOULD_QUIT.store(true, Ordering::Relaxed);
@@ -189,11 +198,7 @@ unsafe extern "system" fn main_wnd_proc(
             let event = lparam as u32;
             match event {
                 0x0203 => { // WM_LBUTTONDBLCLK
-                    let settings_hwnd = SETTINGS_HWND.load(Ordering::Relaxed) as HWND;
-                    if !settings_hwnd.is_null() {
-                        ShowWindow(settings_hwnd, SW_SHOWNORMAL);
-                        SetForegroundWindow(settings_hwnd);
-                    }
+                    run_settings();
                 }
                 0x0205 => { // WM_RBUTTONUP
                     show_tray_menu(hwnd);
@@ -209,6 +214,16 @@ unsafe extern "system" fn main_wnd_proc(
             0
         }
         _ => DefWindowProcW(hwnd, msg, wparam, lparam),
+    }
+}
+
+/// Run the egui settings window (blocking).
+fn run_settings() {
+    unsafe {
+        let hinstance = GetModuleHandleW(std::ptr::null());
+        egui_windows::run_settings_window(hinstance);
+        // Re-register hotkeys in case they were changed in settings
+        register_hotkeys(MAIN_HWND.load(Ordering::Relaxed) as HWND);
     }
 }
 

@@ -81,18 +81,18 @@ dependencies = [
 
 [[package]]
 name = "findex-cli"
-version = "0.1.4"
+version = "0.1.8"
 dependencies = [
  "findex-engine",
 ]
 
 [[package]]
 name = "findex-engine"
-version = "0.1.4"
+version = "0.1.8"
 
 [[package]]
 name = "findex-ui"
-version = "0.1.4"
+version = "0.1.8"
 dependencies = [
  "egui",
  "epaint",
