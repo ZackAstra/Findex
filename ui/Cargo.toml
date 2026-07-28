@@ -1,11 +1,13 @@
 ﻿[package]
-name = "findex-ui"
-version.workspace = true
-edition.workspace = true
-license.workspace = true
-description = "Findex graphical user interface"
+name = "findex"
+version = "0.1.9"
+edition = "2021"
+license = "MIT"
+description = "Findex - Fast Windows file search tool"
 
 [dependencies]
 findex-engine = { path = "../engine" }
 egui = "0.27"
 epaint = "0.27"
+
+

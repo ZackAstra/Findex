@@ -80,24 +80,17 @@ dependencies = [
 ]
 
 [[package]]
-name = "findex-cli"
-version = "0.1.8"
-dependencies = [
- "findex-engine",
-]
-
-[[package]]
-name = "findex-engine"
-version = "0.1.8"
-
-[[package]]
-name = "findex-ui"
-version = "0.1.8"
+name = "findex"
+version = "0.1.9"
 dependencies = [
  "egui",
  "epaint",
  "findex-engine",
 ]
+
+[[package]]
+name = "findex-engine"
+version = "0.1.9"
 
 [[package]]
 name = "libc"

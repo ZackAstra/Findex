@@ -5,7 +5,7 @@ Findex is a lightweight Windows file search tool that combines the indexing spee
 ## 🚀 Quick Start
 
 ### GUI (图形界面)
-双击 `findex-ui.exe` 启动。**首次启动自动索引所有可用磁盘**，后续启动秒加载。
+双击 `findex.exe` 启动。**首次启动自动索引所有可用磁盘**，后续启动秒加载。
 
 启动后自动常驻系统托盘，无窗口显示。
 
@@ -35,7 +35,7 @@ findex status
 
 | 版本 | 说明 |
 |------|------|
-| v0.1.9 | 最新版 — 首次启动自动建索引 + 索引路径规范化 |
+| v0.1.9.1 | 最新版 — 单 exe 合并 + 自动建索引 + 持久化 |
 | v0.1.8 | 文件类型筛选 + 快捷键配置 + 排除规则 |
 | v0.1.4 | egui 技术验证 + 渲染引擎 |
 | v0.1.0 | 初始 GUI 版本 |
@@ -83,8 +83,7 @@ findex help                # 显示帮助
 # 确保 dlltool 在 PATH 中（或使用 scripts/dlltool.rs 绕行方案）
 $env:Path = "D:\Findows\scripts;$env:Path"
 
-cargo +stable-x86_64-pc-windows-gnu build --release -p findex-cli
-cargo +stable-x86_64-pc-windows-gnu build --release -p findex-ui
+cargo +stable-x86_64-pc-windows-gnu build --release -p findex
 ```
 
 ## 📁 Project Structure
@@ -100,7 +99,7 @@ findex/
 │       ├── types.rs         # Core data types
 │       └── walker.rs        # Filesystem scanner
 ├── cli/          # CLI tool (Rust binary)
-│   └── src/main.rs
+│   (已合并到 ui/)
 ├── ui/           # GUI tool (Rust binary, Win32 + egui)
 │   └── src/
 │       ├── win32.rs         # Win32 API FFI declarations
@@ -116,6 +115,12 @@ findex/
 
 ## 📋 Changelog
 
+### v0.1.9.1 (2026-07-28)
+- 🔧 **单 exe 合并** — CLI + GUI 合并为单个 \index.exe\，\index search/index/status/help\ 命令行模式
+- ✨ **索引持久化确认** — 索引保存到 \%APPDATA%/Findex/index.db\，后续启动秒加载
+- 🔧 **路径无关** — exe 可在任意位置运行，索引路径统一
+- 🗑️ **删除独立 findex.exe / findex.exe** — 统一为单一 findex.exe
+- 📖 **更新使用说明**
 ### v0.1.9 (2026-07-28)
 - ✨ **首次启动自动建索引** — 检测所有可用盘符，自动构建 Trie 索引
 - ✨ **索引路径规范化** — 统一保存在 `%APPDATA%/Findex/index.db`，exe 可任意位置运行
@@ -194,3 +199,6 @@ Issues and PRs are welcome! See [DEVELOPMENT_PLAN.md](DEVELOPMENT_PLAN.md) for d
 ## 📄 License
 
 MIT
+
+
+
