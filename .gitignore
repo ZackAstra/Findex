@@ -37,3 +37,9 @@ scripts/dlltool.rs
 scripts/dlltool.exe
 scripts/*.o
 scripts/*.log
+
+# Node.js
+nodejs/
+src-tauri/node_modules/
+src-tauri/.tauri/
+*.crate
