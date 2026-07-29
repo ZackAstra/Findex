@@ -81,7 +81,7 @@ dependencies = [
 
 [[package]]
 name = "findex"
-version = "0.1.9"
+version = "0.2.0"
 dependencies = [
  "egui",
  "epaint",
@@ -90,7 +90,7 @@ dependencies = [
 
 [[package]]
 name = "findex-engine"
-version = "0.1.9"
+version = "0.2.0"
 
 [[package]]
 name = "libc"

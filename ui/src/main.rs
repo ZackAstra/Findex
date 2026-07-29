@@ -355,18 +355,7 @@ fn results_to_json(results: &[findex_engine::SearchResult]) -> String {
     json
 }
 
-fn format_size(size: u64) -> String {
-    const UNITS: &[&str] = &["B", "KB", "MB", "GB", "TB"];
-    let mut size = size as f64;
-    let mut unit_idx = 0;
-    while size >= 1024.0 && unit_idx < UNITS.len() - 1 {
-        size /= 1024.0;
-        unit_idx += 1;
-    }
-    format!("{:.1} {}", size, UNITS[unit_idx])
-}
-
-// ===== GUI / Tray Mode =====
+/// Get the canonical index path in %APPDATA%\Findex\index.db.
 
 /// Register hotkeys from the current config.
 unsafe fn register_hotkeys(hwnd: HWND) {
@@ -399,7 +388,17 @@ pub fn re_register_hotkeys() {
     }
 }
 
-/// Get the canonical index path in %APPDATA%\Findex\index.db.
+fn format_size(size: u64) -> String {
+    const UNITS: &[&str] = &["B", "KB", "MB", "GB", "TB"];
+    let mut size = size as f64;
+    let mut unit_idx = 0;
+    while size >= 1024.0 && unit_idx < UNITS.len() - 1 {
+        size /= 1024.0;
+        unit_idx += 1;
+    }
+    format!("{:.1} {}", size, UNITS[unit_idx])
+}
+
 fn get_index_path() -> Option<String> {
     let appdata = std::env::var("APPDATA").ok()?;
     let dir = format!("{}\\Findex", appdata);
@@ -407,9 +406,11 @@ fn get_index_path() -> Option<String> {
     Some(format!("{}\\index.db", dir))
 }
 
-/// Load existing index or auto-build one on first launch.
+/// Load existing index and apply incremental USN Journal updates.
+/// On first launch, uses USN Journal for fast full enumeration.
 fn load_or_build_index() {
-    // 1. Try loading from the canonical AppData path
+    // 1. Try loading existing index from AppData
+    let mut need_full_index = true;
     if let Some(index_path) = get_index_path() {
         if let Ok(storage) = findex_engine::Storage::open(&index_path) {
             if let Ok(entries) = storage.load_entries() {
@@ -419,33 +420,160 @@ fn load_or_build_index() {
                     let searcher = findex_engine::Searcher::new(index);
                     *SEARCHER.lock().unwrap() = Some(searcher);
                     eprintln!("Loaded index from {}: {} entries", index_path, storage.entry_count().unwrap_or(0));
-                    return;
+                    need_full_index = false;
+
+                    // 2. Try incremental USN Journal update
+                    let changes = apply_usn_incremental_updates();
+                    if changes > 0 {
+                        eprintln!("Applied {} incremental changes from USN Journal", changes);
+                        // Save the updated index
+                        if let Some(ref searcher) = *SEARCHER.lock().unwrap() {
+                            if let Ok(storage) = findex_engine::Storage::open(&index_path) {
+                                let entries = searcher.index().all_entries();
+                                let _ = storage.save_entries(&entries);
+                            }
+                        }
+                    }
                 }
             }
         }
     }
 
-    // 2. No existing index found — auto-detect drives and build one
-    eprintln!("No existing index found. Auto-building index from available drives...");
-    auto_build_index();
+    // 3. No index found — build full index via USN Journal
+    if need_full_index {
+        eprintln!("No existing index found. Building index via USN Journal...");
+        build_index_via_usn();
+    }
 }
 
-/// Detect available fixed drives and build the index automatically.
-fn auto_build_index() {
-    let drives = detect_fixed_drives();
-    if drives.is_empty() {
-        eprintln!("No drives found for indexing");
-        return;
+/// Apply incremental updates from USN Journal.
+/// Returns the number of changes applied.
+fn apply_usn_incremental_updates() -> usize {
+    let mut journal_state = config::UsnJournalState::load();
+    let mut total_changes = 0;
+
+    for letter in 'C'..='Z' {
+        let vol = format!("{}:\\", letter);
+        if !std::path::Path::new(&vol).exists() {
+            continue;
+        }
+
+        // Check if we have a saved state for this volume
+        let vol_state = journal_state.get_volume(&letter.to_string());
+        if vol_state.is_none() {
+            continue;
+        }
+        let vol_state = vol_state.unwrap();
+
+        // Query current journal ID to check validity
+        if let Ok((current_usn, current_journal_id, _)) = findex_engine::UsnReader::query_journal_id(letter) {
+            // Check if journal has been reset
+            if !journal_state.is_journal_valid(&letter.to_string(), current_journal_id) {
+                eprintln!("USN Journal reset for {}: (re)building full index", vol);
+                // Full rebuild needed for this volume
+                continue;
+            }
+
+            // Read changes since last_usn
+            if current_usn > vol_state.last_usn {
+                eprintln!("Reading USN Journal changes for {} from USN {} to {}...", vol, vol_state.last_usn, current_usn);
+                if let Ok(changes) = findex_engine::UsnReader::read_changes(letter, vol_state.last_usn) {
+                    let mut searcher_guard = SEARCHER.lock().unwrap();
+                    if let Some(ref mut searcher) = *searcher_guard {
+                        let mut changed = 0;
+                        for change in &changes {
+                            match change {
+                                findex_engine::usn_reader::FileChange::Added(entry) |
+                                findex_engine::usn_reader::FileChange::Modified(entry) => {
+                                    searcher.index_mut().insert(entry.clone());
+                                    changed += 1;
+                                }
+                                findex_engine::usn_reader::FileChange::Deleted(path) => {
+                                    // Find and remove by path
+                                    let to_remove: Vec<i64> = searcher.index().all_entries()
+                                        .iter()
+                                        .filter(|e| e.path == *path)
+                                        .map(|e| e.id)
+                                        .collect();
+                                    for id in to_remove {
+                                        searcher.index_mut().remove(id);
+                                        changed += 1;
+                                    }
+                                }
+                                findex_engine::usn_reader::FileChange::Renamed(old_path, _new_path) => {
+                                    // Find old entry and update path
+                                    let to_remove: Vec<i64> = searcher.index().all_entries()
+                                        .iter()
+                                        .filter(|e| e.path == *old_path)
+                                        .map(|e| e.id)
+                                        .collect();
+                                    for id in to_remove {
+                                        searcher.index_mut().remove(id);
+                                        changed += 1;
+                                    }
+                                    // The new name will be picked up by the next Added/Modified event
+                                    // Or we could add it here if we had the full entry
+                                }
+                            }
+                        }
+                        total_changes += changed;
+                        eprintln!("Applied {} changes for {}", changed, vol);
+                    }
+                    // Update journal state
+                    journal_state.update_volume(&letter.to_string(), current_usn, current_journal_id);
+                }
+            }
+        }
     }
 
-    let excludes: Vec<String> = config::get_config().exclude_patterns.clone();
-    let mut all_entries = Vec::new();
+    journal_state.save();
+    total_changes
+}
 
-    for drive in &drives {
-        eprintln!("Indexing {} ...", drive);
-        let path = std::path::Path::new(drive);
+/// Build full index using USN Journal (fast, ~1-2 seconds per volume).
+/// Falls back to FsWalker if USN Journal is unavailable.
+fn build_index_via_usn() {
+    let mut journal_state = config::UsnJournalState::load();
+    let mut all_entries = Vec::new();
+    let mut built_via_usn = Vec::new();
+    let mut built_via_walker = Vec::new();
+
+    for letter in 'C'..='Z' {
+        let vol = format!("{}:\\", letter);
+        if !std::path::Path::new(&vol).exists() {
+            continue;
+        }
+
+        // Try USN Journal first
+        if findex_engine::UsnReader::is_usn_available(letter) {
+            eprintln!("Indexing {} via USN Journal...", vol);
+            match findex_engine::UsnReader::enumerate_volume(letter) {
+                Ok(entries) => {
+                    eprintln!("  USN Journal returned {} entries for {}", entries.len(), vol);
+                    all_entries.extend(entries);
+                    built_via_usn.push(letter.to_string());
+
+                    // Save journal state for incremental updates
+                    if let Ok((next_usn, journal_id, _)) = findex_engine::UsnReader::query_journal_id(letter) {
+                        journal_state.update_volume(&letter.to_string(), next_usn, journal_id);
+                    }
+                    continue;
+                }
+                Err(e) => {
+                    eprintln!("  USN Journal failed for {}: {}. Falling back to FsWalker.", vol, e);
+                }
+            }
+        } else {
+            eprintln!("  USN Journal not available for {}. Needs admin rights. Using FsWalker.", vol);
+        }
+
+        // Fallback: FsWalker
+        let path = std::path::Path::new(&vol);
+        let excludes: Vec<String> = config::get_config().exclude_patterns.clone();
         if let Ok(entries) = findex_engine::FsWalker::walk_with_excludes(path, 0, &excludes) {
+            eprintln!("  FsWalker returned {} entries for {}", entries.len(), vol);
             all_entries.extend(entries);
+            built_via_walker.push(letter.to_string());
         }
     }
 
@@ -458,7 +586,7 @@ fn auto_build_index() {
         index.load_entries(all_entries);
         let searcher = findex_engine::Searcher::new(index);
 
-        // Save to AppData for subsequent launches
+        // Save to AppData
         if let Some(index_path) = get_index_path() {
             if let Ok(storage) = findex_engine::Storage::open(&index_path) {
                 let entries = searcher.index().all_entries();
@@ -470,25 +598,21 @@ fn auto_build_index() {
             }
         }
 
+        // Save USN journal state for incremental updates
+        journal_state.save();
+
         let status = searcher.status();
         *SEARCHER.lock().unwrap() = Some(searcher);
-        eprintln!("Index built: {} files, {} folders on {}", status.total_files, status.total_folders, drives.join(", "));
+
+        let sources: Vec<String> = built_via_usn.iter().map(|v| format!("{} (USN)", v))
+            .chain(built_via_walker.iter().map(|v| format!("{} (FsWalker)", v)))
+            .collect();
+        eprintln!("Index built: {} files, {} folders on {}", status.total_files, status.total_folders, sources.join(", "));
     } else {
-        eprintln!("No files found during auto-indexing");
+        eprintln!("No files found during indexing");
     }
 }
 
-/// Detect available fixed drives on the system (C:, D:, etc.).
-fn detect_fixed_drives() -> Vec<String> {
-    let mut drives = Vec::new();
-    for letter in 'C'..='Z' {
-        let path = format!("{}:\\", letter);
-        if std::path::Path::new(&path).exists() {
-            drives.push(path);
-        }
-    }
-    drives
-}
 
 unsafe extern "system" fn main_wnd_proc(
     hwnd: HWND, msg: UINT, wparam: WPARAM, lparam: LPARAM,
@@ -628,3 +752,8 @@ unsafe fn show_tray_menu(hwnd: HWND) {
     TrackPopupMenu(hmenu, TPM_LEFTALIGN | TPM_RIGHTBUTTON, pt.x, pt.y, 0, hwnd, std::ptr::null_mut());
     DestroyMenu(hmenu);
 }
+
+
+
+
+

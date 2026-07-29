@@ -438,3 +438,135 @@ fn json_escape(s: &str) -> String {
 fn bool_to_int(b: bool) -> i32 {
     if b { 1 } else { 0 }
 }
+
+// ===== USN Journal State Tracking =====
+
+/// USN Journal state for a single volume.
+#[derive(Debug, Clone)]
+pub struct VolumeJournalState {
+    pub volume_letter: String,
+    pub last_usn: i64,
+    pub usn_journal_id: u64,
+}
+
+/// USN Journal state for all volumes (persisted to usn_state.json).
+#[derive(Debug, Clone)]
+pub struct UsnJournalState {
+    pub volumes: Vec<VolumeJournalState>,
+}
+
+impl UsnJournalState {
+    pub fn new() -> Self {
+        UsnJournalState { volumes: Vec::new() }
+    }
+
+    /// Get the USN journal state path in AppData.
+    fn get_state_path() -> Option<String> {
+        let appdata = std::env::var("APPDATA").ok()?;
+        let dir = format!("{}\\Findex", appdata);
+        let _ = std::fs::create_dir_all(&dir);
+        Some(format!("{}\\usn_state.json", dir))
+    }
+
+    /// Load USN journal state from disk.
+    pub fn load() -> Self {
+        if let Some(path) = Self::get_state_path() {
+            if let Ok(content) = std::fs::read_to_string(&path) {
+                let content = content.trim();
+                if content.starts_with('{') {
+                    return Self::from_json(content);
+                }
+            }
+        }
+        Self::new()
+    }
+
+    /// Save USN journal state to disk.
+    pub fn save(&self) {
+        if let Some(path) = Self::get_state_path() {
+            let json = self.to_json();
+            let _ = std::fs::write(&path, json);
+        }
+    }
+
+    /// Update a volume's journal state.
+    pub fn update_volume(&mut self, volume_letter: &str, last_usn: i64, usn_journal_id: u64) {
+        for v in &mut self.volumes {
+            if v.volume_letter == volume_letter {
+                v.last_usn = last_usn;
+                v.usn_journal_id = usn_journal_id;
+                return;
+            }
+        }
+        self.volumes.push(VolumeJournalState {
+            volume_letter: volume_letter.to_string(),
+            last_usn,
+            usn_journal_id,
+        });
+    }
+
+    /// Get the state for a specific volume.
+    pub fn get_volume(&self, volume_letter: &str) -> Option<&VolumeJournalState> {
+        self.volumes.iter().find(|v| v.volume_letter == volume_letter)
+    }
+
+    /// Check if a volume's journal ID has changed (journal was reset).
+    pub fn is_journal_valid(&self, volume_letter: &str, current_journal_id: u64) -> bool {
+        self.volumes.iter()
+            .find(|v| v.volume_letter == volume_letter)
+            .map(|v| v.usn_journal_id == current_journal_id)
+            .unwrap_or(false)
+    }
+
+    fn to_json(&self) -> String {
+        let vols: Vec<String> = self.volumes.iter().map(|v| {
+            format!(
+                r#"{{"volume_letter":"{}","last_usn":{},"usn_journal_id":{}}}"#,
+                json_escape(&v.volume_letter), v.last_usn, v.usn_journal_id
+            )
+        }).collect();
+        let vols_str = vols.join(",\n    ");
+        format!("{{\n  \"volumes\": [\n    {}\n  ]\n}}\n", vols_str)
+    }
+
+    fn from_json(s: &str) -> Self {
+        let mut volumes = Vec::new();
+        if let Some(vol_start) = s.find('[') {
+            if let Some(vol_end) = s[vol_start..].find(']') {
+                let content = &s[vol_start + 1..vol_start + vol_end];
+                for item in content.split('{').skip(1) {
+                    let item = format!("{{{}}}", item.trim_end_matches(',').trim_end_matches('}').trim());
+                    let letter = extract_json_value(&item, "volume_letter").unwrap_or_default();
+                    let last_usn = extract_json_value(&item, "last_usn")
+                        .and_then(|v| v.parse::<i64>().ok()).unwrap_or(0);
+                    let journal_id = extract_json_value(&item, "usn_journal_id")
+                        .and_then(|v| v.parse::<u64>().ok()).unwrap_or(0);
+                    if !letter.is_empty() {
+                        volumes.push(VolumeJournalState {
+                            volume_letter: letter,
+                            last_usn,
+                            usn_journal_id: journal_id,
+                        });
+                    }
+                }
+            }
+        }
+        UsnJournalState { volumes }
+    }
+}
+
+fn extract_json_value(s: &str, key: &str) -> Option<String> {
+    let pattern = format!("\"{}\"", key);
+    let idx = s.find(&pattern)?;
+    let after = &s[idx + pattern.len()..];
+    let colon = after.find(':')?;
+    let val_start = colon + 1;
+    let val = after[val_start..].trim();
+    if val.starts_with('"') {
+        let end = val[1..].find('"')?;
+        Some(val[1..=end].to_string())
+    } else {
+        let end = val.find(|c: char| c == ',' || c == '}' || c == '\n' || c == '\r').unwrap_or(val.len());
+        Some(val[..end].trim().to_string())
+    }
+}
