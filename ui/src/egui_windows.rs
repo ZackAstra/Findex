@@ -509,150 +509,182 @@ unsafe extern "system" fn settings_wnd_proc(
                     state.config.theme = new_theme.to_string();
                     apply_theme(&state.ctx, Theme::from_str(new_theme));
                 }
+                let is_dark = state.ctx.style().visuals.dark_mode;
+                let card_bg = if is_dark { egui::Color32::from_rgb(30, 30, 30) } else { egui::Color32::from_rgb(255, 255, 255) };
+                let card_stroke = if is_dark { egui::Color32::from_rgb(51, 51, 51) } else { egui::Color32::from_rgb(224, 224, 224) };
+                let accent = egui::Color32::from_rgb(10, 132, 255);
+                let text_secondary = if is_dark { egui::Color32::from_rgb(160, 160, 160) } else { egui::Color32::from_rgb(102, 102, 102) };
+                let card_frame = egui::Frame {
+                    fill: card_bg,
+                    stroke: egui::Stroke::new(1.0_f32, card_stroke),
+                    rounding: egui::Rounding::same(8.0),
+                    inner_margin: egui::Margin::symmetric(12.0, 10.0),
+                    ..Default::default()
+                };
                 let output = state.ctx.run(input, |ctx| {
                     egui::CentralPanel::default()
                         .frame(egui::Frame::none().fill(ctx.style().visuals.window_fill()))
                         .show(ctx, |ui| {
                             egui::ScrollArea::vertical().show(ui, |ui| {
-                                ui.horizontal(|ui| { ui.label("\u{2699}"); ui.heading("Findex Settings"); });
-                                ui.separator();
-                                // Theme
-                                ui.label("Theme:");
+                                // Title
                                 ui.horizontal(|ui| {
-                                    ui.selectable_value(&mut state.theme_idx, 0, "Light");
-                                    ui.selectable_value(&mut state.theme_idx, 1, "Dark");
-                                    ui.selectable_value(&mut state.theme_idx, 2, "System");
+                                    ui.label(egui::RichText::new("\u{2699}").size(18.0).color(accent));
+                                    let title_color = if is_dark { egui::Color32::from_rgb(255, 255, 255) } else { egui::Color32::from_rgb(29, 29, 31) };
+                                    ui.heading(egui::RichText::new("Findex Settings").color(title_color));
                                 });
-                                ui.separator();
-                                // Hotkeys
-                                ui.label("Hotkeys (click to record):");
-                                ui.horizontal(|ui| {
-                                    ui.label("Search:");
-                                    if ui.button(&state.hotkey_search_buffer).clicked() {
-                                        state.recorded_hotkey = Some("search".to_string());
-                                        state.hotkey_search_buffer = "Recording...".to_string();
-                                    }
+                                ui.add_space(8.0);
+                                // Theme Card
+                                card_frame.show(ui, |ui| {
+                                    ui.label(egui::RichText::new("\u{1F3A8} Theme").size(14.0).color(accent).strong());
+                                    ui.add_space(6.0);
+                                    ui.horizontal(|ui| {
+                                        ui.selectable_value(&mut state.theme_idx, 0, "Light");
+                                        ui.selectable_value(&mut state.theme_idx, 1, "Dark");
+                                        ui.selectable_value(&mut state.theme_idx, 2, "System");
+                                    });
                                 });
-                                ui.horizontal(|ui| {
-                                    ui.label("Settings:");
-                                    if ui.button(&state.hotkey_settings_buffer).clicked() {
-                                        state.recorded_hotkey = Some("settings".to_string());
-                                        state.hotkey_settings_buffer = "Recording...".to_string();
-                                    }
-                                });
-                                // Handle hotkey recording
-                                if let Some(ref target) = state.recorded_hotkey.clone() {
-                                    ctx.input(|i| {
-                                        for event in &i.events {
-                                            if let egui::Event::Key { key, pressed: true, modifiers, .. } = event {
-                                                let has_mod = modifiers.ctrl || modifiers.shift || modifiers.alt || modifiers.mac_cmd;
-                                                if has_mod {
-                                                    let mut mods = 0u32;
-                                                    if modifiers.ctrl { mods |= 0x0002; }
-                                                    if modifiers.shift { mods |= 0x0004; }
-                                                    if modifiers.alt { mods |= 0x0001; }
-                                                    if modifiers.mac_cmd { mods |= 0x0008; }
-                                                    let vk = match key {
-                                                        egui::Key::Space => 0x20, egui::Key::Enter => 0x0D,
-                                                        egui::Key::Escape => 0x1B, egui::Key::Tab => 0x09,
-                                                        egui::Key::F1 => 0x70, egui::Key::F2 => 0x71,
-                                                        egui::Key::F3 => 0x72, egui::Key::F4 => 0x73,
-                                                        egui::Key::F5 => 0x74, egui::Key::F6 => 0x75,
-                                                        egui::Key::F7 => 0x76, egui::Key::F8 => 0x77,
-                                                        egui::Key::F9 => 0x78, egui::Key::F10 => 0x79,
-                                                        egui::Key::F11 => 0x7A, egui::Key::F12 => 0x7B,
-                                                        egui::Key::ArrowUp => 0x26, egui::Key::ArrowDown => 0x28,
-                                                        egui::Key::ArrowLeft => 0x25, egui::Key::ArrowRight => 0x27,
-                                                        _ => continue,
-                                                    };
-                                                    let hotkey_str = format_hotkey(mods, vk);
-                                                    if target == "search" {
-                                                        state.hotkey_search_buffer = hotkey_str;
-                                                    } else {
-                                                        state.hotkey_settings_buffer = hotkey_str;
+                                ui.add_space(6.0);
+                                // Hotkeys Card
+                                card_frame.show(ui, |ui| {
+                                    ui.label(egui::RichText::new("\u{2328} Hotkeys").size(14.0).color(accent).strong());
+                                    ui.add_space(6.0);
+                                    ui.horizontal(|ui| {
+                                        ui.label(egui::RichText::new("Search:").color(text_secondary));
+                                        if ui.button(&state.hotkey_search_buffer).clicked() {
+                                            state.recorded_hotkey = Some("search".to_string());
+                                            state.hotkey_search_buffer = "Recording...".to_string();
+                                        }
+                                    });
+                                    ui.horizontal(|ui| {
+                                        ui.label(egui::RichText::new("Settings:").color(text_secondary));
+                                        if ui.button(&state.hotkey_settings_buffer).clicked() {
+                                            state.recorded_hotkey = Some("settings".to_string());
+                                            state.hotkey_settings_buffer = "Recording...".to_string();
+                                        }
+                                    });
+                                    if let Some(ref target) = state.recorded_hotkey.clone() {
+                                        ctx.input(|i| {
+                                            for event in &i.events {
+                                                if let egui::Event::Key { key, pressed: true, modifiers, .. } = event {
+                                                    let has_mod = modifiers.ctrl || modifiers.shift || modifiers.alt || modifiers.mac_cmd;
+                                                    if has_mod {
+                                                        let mut mods = 0u32;
+                                                        if modifiers.ctrl { mods |= 0x0002; }
+                                                        if modifiers.shift { mods |= 0x0004; }
+                                                        if modifiers.alt { mods |= 0x0001; }
+                                                        if modifiers.mac_cmd { mods |= 0x0008; }
+                                                        let vk = match key {
+                                                            egui::Key::Space => 0x20, egui::Key::Enter => 0x0D,
+                                                            egui::Key::Escape => 0x1B, egui::Key::Tab => 0x09,
+                                                            egui::Key::F1 => 0x70, egui::Key::F2 => 0x71,
+                                                            egui::Key::F3 => 0x72, egui::Key::F4 => 0x73,
+                                                            egui::Key::F5 => 0x74, egui::Key::F6 => 0x75,
+                                                            egui::Key::F7 => 0x76, egui::Key::F8 => 0x77,
+                                                            egui::Key::F9 => 0x78, egui::Key::F10 => 0x79,
+                                                            egui::Key::F11 => 0x7A, egui::Key::F12 => 0x7B,
+                                                            egui::Key::ArrowUp => 0x26, egui::Key::ArrowDown => 0x28,
+                                                            egui::Key::ArrowLeft => 0x25, egui::Key::ArrowRight => 0x27,
+                                                            _ => continue,
+                                                        };
+                                                        let hotkey_str = format_hotkey(mods, vk);
+                                                        if target == "search" {
+                                                            state.hotkey_search_buffer = hotkey_str;
+                                                        } else {
+                                                            state.hotkey_settings_buffer = hotkey_str;
+                                                        }
+                                                        state.recorded_hotkey = None;
                                                     }
-                                                    state.recorded_hotkey = None;
                                                 }
                                             }
-                                        }
-                                    });
-                                }
-                                ui.separator();
-                                // Index Paths
-                                ui.label("Index Paths:");
-                                let mut remove_idx = None;
-                                let mut selected_idx = None;
-                                for (i, path) in state.config.index_paths.clone().iter().enumerate() {
+                                        });
+                                    }
+                                });
+                                ui.add_space(6.0);
+                                // Index Paths Card
+                                card_frame.show(ui, |ui| {
+                                    ui.label(egui::RichText::new("\u{1F4C1} Index Paths").size(14.0).color(accent).strong());
+                                    ui.add_space(6.0);
+                                    let mut remove_idx = None;
+                                    for (i, path) in state.config.index_paths.clone().iter().enumerate() {
+                                        ui.horizontal(|ui| {
+                                            let sel = state.selected_path_index == Some(i);
+                                            if ui.selectable_label(sel, &**path).clicked() { state.selected_path_index = Some(i); }
+                                            if ui.button(egui::RichText::new("X").color(egui::Color32::from_rgb(255, 69, 58))).clicked() { remove_idx = Some(i); }
+                                        });
+                                    }
+                                    if let Some(idx) = remove_idx {
+                                        if idx < state.config.index_paths.len() { state.config.index_paths.remove(idx); state.selected_path_index = None; }
+                                    }
                                     ui.horizontal(|ui| {
-                                        let sel = state.selected_path_index == Some(i);
-                                        if ui.selectable_label(sel, path).clicked() { selected_idx = Some(i); }
-                                        if ui.button("X").clicked() { remove_idx = Some(i); }
+                                        if ui.button("+ Browse").clicked() { state.pending_browse = true; }
+                                        ui.label(egui::RichText::new("(click + to add folder)").size(11.0).color(text_secondary));
                                     });
-                                }
-                                if let Some(idx) = remove_idx {
-                                    if idx < state.config.index_paths.len() { state.config.index_paths.remove(idx); state.selected_path_index = None; }
-                                }
-                                if let Some(idx) = selected_idx { state.selected_path_index = Some(idx); }
-                                ui.horizontal(|ui| {
-                                    if ui.button("Browse...").clicked() { state.pending_browse = true; }
-                                    if state.config.index_paths.len() > 0 {
-                                        if ui.button("Delete Selected").clicked() {
-                                            if let Some(idx) = state.selected_path_index {
-                                                if idx < state.config.index_paths.len() { state.config.index_paths.remove(idx); state.selected_path_index = None; }
+                                });
+                                ui.add_space(6.0);
+                                // Exclude Patterns Card
+                                card_frame.show(ui, |ui| {
+                                    ui.label(egui::RichText::new("\u{1F6AB} Exclude Patterns").size(14.0).color(accent).strong());
+                                    ui.add_space(6.0);
+                                    let mut remove_exclude = None;
+                                    for (i, pattern) in state.config.exclude_patterns.clone().iter().enumerate() {
+                                        ui.horizontal(|ui| {
+                                            let sel = state.selected_exclude_index == Some(i);
+                                            if ui.selectable_label(sel, &**pattern).clicked() { state.selected_exclude_index = Some(i); }
+                                            if ui.button(egui::RichText::new("X").color(egui::Color32::from_rgb(255, 69, 58))).clicked() { remove_exclude = Some(i); }
+                                        });
+                                    }
+                                    if let Some(idx) = remove_exclude {
+                                        if idx < state.config.exclude_patterns.len() { state.config.exclude_patterns.remove(idx); state.selected_exclude_index = None; }
+                                    }
+                                    ui.horizontal(|ui| {
+                                        let _resp = ui.add_sized(egui::vec2(200.0, 20.0),
+                                            egui::TextEdit::singleline(&mut state.exclude_pattern_buffer)
+                                                .hint_text("e.g. node_modules"));
+                                        if ui.button("Add").clicked() && !state.exclude_pattern_buffer.is_empty() {
+                                            let p = state.exclude_pattern_buffer.trim().to_string();
+                                            if !p.is_empty() && !state.config.exclude_patterns.contains(&p) {
+                                                state.config.exclude_patterns.push(p);
                                             }
+                                            state.exclude_pattern_buffer.clear();
                                         }
-                                    }
-                                });
-                                ui.separator();
-                                // Exclude Patterns
-                                ui.label("Exclude Patterns:");
-                                let mut remove_exclude = None;
-                                for (i, pattern) in state.config.exclude_patterns.clone().iter().enumerate() {
-                                    ui.horizontal(|ui| {
-                                        let sel = state.selected_exclude_index == Some(i);
-                                        if ui.selectable_label(sel, &**pattern).clicked() { state.selected_exclude_index = Some(i); }
-                                        if ui.button("X").clicked() { remove_exclude = Some(i); }
                                     });
-                                }
-                                if let Some(idx) = remove_exclude {
-                                    if idx < state.config.exclude_patterns.len() { state.config.exclude_patterns.remove(idx); state.selected_exclude_index = None; }
-                                }
+                                });
+                                ui.add_space(6.0);
+                                // Search Options Card
+                                card_frame.show(ui, |ui| {
+                                    ui.label(egui::RichText::new("\u{1F50D} Search Options").size(14.0).color(accent).strong());
+                                    ui.add_space(6.0);
+                                    ui.horizontal(|ui| {
+                                        ui.checkbox(&mut state.config.enable_pinyin, "Enable Pinyin");
+                                        ui.checkbox(&mut state.config.enable_fuzzy, "Enable Fuzzy");
+                                    });
+                                    ui.horizontal(|ui| {
+                                        ui.checkbox(&mut state.config.show_hidden, "Show Hidden");
+                                        ui.checkbox(&mut state.config.auto_index, "Auto-Index");
+                                    });
+                                    ui.horizontal(|ui| {
+                                        ui.label(egui::RichText::new("Max Results:").color(text_secondary));
+                                        ui.add(egui::Slider::new(&mut state.config.max_results, 10..=500).text("items"));
+                                    });
+                                });
+                                ui.add_space(8.0);
+                                // Action Buttons
                                 ui.horizontal(|ui| {
-                                    let _resp = ui.add_sized(egui::vec2(200.0, 20.0),
-                                        egui::TextEdit::singleline(&mut state.exclude_pattern_buffer)
-                                            .hint_text("e.g. node_modules"));
-                                    if ui.button("Add").clicked() && !state.exclude_pattern_buffer.is_empty() {
-                                        let p = state.exclude_pattern_buffer.trim().to_string();
-                                        if !p.is_empty() && !state.config.exclude_patterns.contains(&p) {
-                                            state.config.exclude_patterns.push(p);
-                                        }
-                                        state.exclude_pattern_buffer.clear();
+                                    if ui.add(egui::Button::new(egui::RichText::new("Index Now").color(accent)).fill(card_bg).rounding(8.0)).clicked() {
+                                        state.pending_index = true;
+                                    }
+                                    if ui.add(egui::Button::new(egui::RichText::new("Save").color(egui::Color32::from_rgb(48, 209, 88))).fill(card_bg).rounding(8.0)).clicked() {
+                                        state.pending_save = true;
+                                    }
+                                    if ui.add(egui::Button::new(egui::RichText::new("Cancel").color(egui::Color32::from_rgb(255, 69, 58))).fill(card_bg).rounding(8.0)).clicked() {
+                                        state.pending_cancel = true;
                                     }
                                 });
-                                ui.separator();
-                                // Search Options
-                                ui.label("Search Options:");
-                                ui.horizontal(|ui| {
-                                    ui.checkbox(&mut state.config.enable_pinyin, "Enable Pinyin");
-                                    ui.checkbox(&mut state.config.enable_fuzzy, "Enable Fuzzy");
+                                ui.add_space(6.0);
+                                // Status Bar
+                                ui.with_layout(egui::Layout::bottom_up(egui::Align::LEFT), |ui| {
+                                    ui.label(egui::RichText::new(&state.status_text).size(11.0).color(text_secondary));
                                 });
-                                ui.horizontal(|ui| {
-                                    ui.checkbox(&mut state.config.show_hidden, "Show Hidden");
-                                    ui.checkbox(&mut state.config.auto_index, "Auto-Index");
-                                });
-                                ui.horizontal(|ui| {
-                                    ui.label("Max Results:");
-                                    ui.add(egui::Slider::new(&mut state.config.max_results, 10..=500).text("items"));
-                                });
-                                ui.separator();
-                                // Actions
-                                ui.horizontal(|ui| {
-                                    if ui.button("Index Now").clicked() { state.pending_index = true; }
-                                    if ui.button("Save").clicked() { state.pending_save = true; }
-                                    if ui.button("Cancel").clicked() { state.pending_cancel = true; }
-                                });
-                                ui.separator();
-                                ui.label(&state.status_text);
                             });
                         });
                 });
@@ -681,6 +713,7 @@ unsafe extern "system" fn settings_wnd_proc(
         _ => DefWindowProcW(hwnd, msg, wparam, lparam),
     }
 }
+
 
 
 
