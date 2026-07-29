@@ -168,6 +168,31 @@ pub fn parse_usn_record(data: &[u8]) -> Option<UsnRecord> {
     })
 }
 
+
+// ===== Token / Privilege Constants =====
+pub const TOKEN_QUERY: DWORD = 0x0008;
+pub const TOKEN_ADJUST_PRIVILEGES: DWORD = 0x0020;
+pub const SE_PRIVILEGE_ENABLED: DWORD = 0x00000002;
+
+// ===== Privilege Structures =====
+#[repr(C)]
+pub struct LUID {
+    pub low_part: u32,
+    pub high_part: i32,
+}
+
+#[repr(C)]
+pub struct LUID_AND_ATTRIBUTES {
+    pub luid: LUID,
+    pub attributes: DWORD,
+}
+
+#[repr(C)]
+pub struct TOKEN_PRIVILEGES {
+    pub privilege_count: u32,
+    pub privileges: [LUID_AND_ATTRIBUTES; 1],
+}
+
 // ===== Kernel32 FFI =====
 #[link(name = "kernel32")]
 extern "system" {
@@ -195,6 +220,29 @@ extern "system" {
     ) -> BOOL;
 
     pub fn GetLastError() -> DWORD;
+
+    pub fn OpenProcessToken(
+        ProcessHandle: HANDLE,
+        DesiredAccess: DWORD,
+        TokenHandle: *mut HANDLE,
+    ) -> BOOL;
+
+    pub fn LookupPrivilegeValueW(
+        lpSystemName: LPCWSTR,
+        lpName: LPCWSTR,
+        lpLuid: *mut LUID,
+    ) -> BOOL;
+
+    pub fn AdjustTokenPrivileges(
+        TokenHandle: HANDLE,
+        DisableAllPrivileges: BOOL,
+        NewState: *const TOKEN_PRIVILEGES,
+        BufferLength: DWORD,
+        PreviousState: *mut TOKEN_PRIVILEGES,
+        ReturnLength: *mut DWORD,
+    ) -> BOOL;
+
+    pub fn GetCurrentProcess() -> HANDLE;
 }
 
 // ===== Helper Functions =====
@@ -213,4 +261,5 @@ pub fn filetime_to_unix_epoch(filetime: i64) -> i64 {
     let seconds = filetime / 10_000_000;
     seconds - unix_epoch_diff
 }
+
 

@@ -262,6 +262,10 @@ impl UsnReader {
 }
 
 fn open_volume(path: &str) -> Result<HANDLE, String> {
+    // Enable SE_BACKUP_NAME privilege before opening volume
+    // This avoids the "access denied" error for admin users without UAC elevation
+    enable_se_backup_privilege();
+
     let wpath = to_wstring(path);
     let handle = unsafe {
         CreateFileW(
@@ -280,6 +284,54 @@ fn open_volume(path: &str) -> Result<HANDLE, String> {
         return Err(format!("Failed to open volume {}: error {}", path, err));
     }
     Ok(handle)
+}
+
+/// Enable the SE_BACKUP_NAME privilege in the current process token.
+/// This allows opening volume devices (\\.\C:) without requiring
+/// full administrator elevation (UAC).
+/// For non-admin users, this silently fails (the privilege isn't in the token).
+/// Reference: https://learn.microsoft.com/en-us/windows/win32/secauthz/enabling-and-disabling-privileges-in-c--
+fn enable_se_backup_privilege() {
+    unsafe {
+        let mut token: HANDLE = 0;
+        if OpenProcessToken(
+            GetCurrentProcess(),
+            TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY,
+            &mut token,
+        ) == 0 {
+            return;
+        }
+
+        let mut luid: LUID = std::mem::zeroed();
+        let se_backup_name = to_wstring("SeBackupPrivilege\0");
+        if LookupPrivilegeValueW(
+            std::ptr::null(),
+            se_backup_name.as_ptr(),
+            &mut luid,
+        ) == 0 {
+            CloseHandle(token);
+            return;
+        }
+
+        let mut tp = TOKEN_PRIVILEGES {
+            privilege_count: 1,
+            privileges: [LUID_AND_ATTRIBUTES {
+                luid,
+                attributes: SE_PRIVILEGE_ENABLED,
+            }],
+        };
+
+        AdjustTokenPrivileges(
+            token,
+            0,  // FALSE: enable specific privilege
+            &mut tp,
+            std::mem::size_of::<TOKEN_PRIVILEGES>() as DWORD,
+            std::ptr::null_mut(),
+            std::ptr::null_mut(),
+        );
+
+        CloseHandle(token);
+    }
 }
 
 fn close_volume(handle: HANDLE) -> Result<(), String> {
@@ -393,6 +445,8 @@ fn resolve_path(
     path_cache.insert(ref_num, full_path.clone());
     Some(full_path)
 }
+
+
 
 
 

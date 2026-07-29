@@ -76,6 +76,37 @@ findex help                # 显示帮助
 --depth <n>     索引递归深度 (0=无限)
 ```
 
+
+## 🏗️ Architecture: USN Journal 权限方案
+
+### 当前方案 (v0.2.x): AdjustTokenPrivileges 单进程
+
+`
+findex.exe (当前用户，未提权)
+  ├─ OpenProcessToken → 获取当前令牌
+  ├─ AdjustTokenPrivileges → 启用 SE_BACKUP_NAME
+  ├─ CreateFileW(\\.\C:) → ✅ 成功 (管理员用户)
+  └─ 如果失败 → 降级到 FsWalker (标准用户)
+`
+
+### 覆盖范围
+| 用户类型 | USN Journal | 降级方案 |
+|----------|-------------|----------|
+| 管理员 (已提权) | ✅ 直接可用 | - |
+| 管理员 (UAC 未提权) | ✅ AdjustTokenPrivileges 启用 | - |
+| 标准用户 | ❌ | 自动降级到 FsWalker |
+
+### 与 Everything/Listary 的架构差异
+
+| 维度 | Everything | Listary | Findex |
+|------|-----------|---------|--------|
+| 进程数 | 2 (服务+UI) | 2 (后台+UI) | 1 (单进程) |
+| 权限来源 | SYSTEM 账户 | 安装时提权 | 当前令牌 |
+| 标准用户支持 | ✅ | ✅ | ❌ (降级) |
+| 安装复杂度 | 高 (服务注册) | 中 | 零 (绿色单 exe) |
+| 开发复杂度 | 高 (IPC) | 中 | 低 |
+
+**定位**: 个人效率工具，覆盖 90%+ 管理员用户场景。企业标准用户场景留待 v0.3.0 服务架构。
 ## 🏗️ Build from Source
 
 ```bash
@@ -114,6 +145,13 @@ findex/
 ```
 
 ## 📋 Changelog
+### v0.2.1 (2026-07-29)
+- ✨ **AdjustTokenPrivileges 权限提升** — 自动启用 SE_BACKUP_NAME 特权，无需 UAC 弹窗
+- ✨ **USN Journal 可用性检测** — 启动时检测并提示管理员运行建议
+- 🔧 **架构定稿** — 单进程 AdjustTokenPrivileges 方案，覆盖管理员用户 90%+ 场景
+- 📖 **架构文档** — Everything/Listary 方案对比分析写入计划文档
+- ✅ **编译零警告**
+
 
 ### v0.1.9.1 (2026-07-28)
 - 🔧 **单 exe 合并** — CLI + GUI 合并为单个 \index.exe\，\index search/index/status/help\ 命令行模式
@@ -199,6 +237,7 @@ Issues and PRs are welcome! See [DEVELOPMENT_PLAN.md](DEVELOPMENT_PLAN.md) for d
 ## 📄 License
 
 MIT
+
 
 
 

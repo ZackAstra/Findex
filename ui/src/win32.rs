@@ -89,9 +89,8 @@ pub const SW_HIDE: i32 = 0;
 pub const SW_SHOWNORMAL: i32 = 1;
 pub const SW_SHOW: i32 = 5;
 pub const SW_RESTORE: i32 = 9;
-pub const SW_SHOWDEFAULT: i32 = 10;
 pub const SW_SHOWMINIMIZED: i32 = 2;
-
+// ===== MessageBox Constants =====
 // Window Messages
 pub const WM_NULL: UINT = 0x0000;
 pub const WM_CREATE: UINT = 0x0001;
@@ -951,6 +950,10 @@ pub const BIF_USENEWUI: UINT = BIF_NEWDIALOGSTYLE | BIF_EDITBOX;
 // GWLP indices for SetWindowLongPtrW / GetWindowLongPtrW
 pub const GWLP_WNDPROC: i32 = -4;
 pub const GWLP_USERDATA: i32 = -21;
+
+
+
+
 
 
 

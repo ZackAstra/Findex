@@ -408,6 +408,17 @@ fn get_index_path() -> Option<String> {
 
 /// Load existing index and apply incremental USN Journal updates.
 /// On first launch, uses USN Journal for fast full enumeration.
+
+/// Get the current executable path.
+fn get_exe_path() -> Vec<u16> {
+    unsafe {
+        let mut buf = vec![0u16; 260];
+        GetModuleFileNameW(std::ptr::null_mut(), buf.as_mut_ptr(), 260);
+        let len = buf.iter().position(|&c| c == 0).unwrap_or(0);
+        buf.truncate(len + 1);
+        buf
+    }
+}
 fn load_or_build_index() {
     // 1. Try loading existing index from AppData
     let mut need_full_index = true;
@@ -533,6 +544,23 @@ fn apply_usn_incremental_updates() -> usize {
 /// Build full index using USN Journal (fast, ~1-2 seconds per volume).
 /// Falls back to FsWalker if USN Journal is unavailable.
 fn build_index_via_usn() {
+    // Check if we can use USN Journal; if not, offer to relaunch as admin
+    let mut any_usn_available = false;
+    for letter in 'C'..='Z' {
+        let vol = format!("{}:\\", letter);
+        if std::path::Path::new(&vol).exists() {
+            if findex_engine::UsnReader::is_usn_available(letter) {
+                any_usn_available = true;
+                break;
+            }
+        }
+    }
+
+    if !any_usn_available {
+        eprintln!("  Tip: Run as administrator for USN Journal fast indexing (1-2 seconds per volume).");
+        eprintln!("  Using standard scanning (FsWalker) as fallback.");
+    }
+
     let mut journal_state = config::UsnJournalState::load();
     let mut all_entries = Vec::new();
     let mut built_via_usn = Vec::new();
@@ -752,6 +780,11 @@ unsafe fn show_tray_menu(hwnd: HWND) {
     TrackPopupMenu(hmenu, TPM_LEFTALIGN | TPM_RIGHTBUTTON, pt.x, pt.y, 0, hwnd, std::ptr::null_mut());
     DestroyMenu(hmenu);
 }
+
+
+
+
+
 
 
 
