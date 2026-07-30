@@ -1,6 +1,6 @@
-﻿[workspace]
+[workspace]
 resolver = "2"
-members = ["engine", "ui", "src-tauri"]
+members = ["engine", "ui"]
 
 [workspace.package]
 version = "0.3.0"
@@ -8,4 +8,7 @@ edition = "2021"
 license = "MIT"
 description = "Findex - Fast Windows file search tool"
 
-
+[profile.release]
+lto = true
+codegen-units = 1
+strip = "symbols"

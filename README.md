@@ -12,32 +12,23 @@
 | 权限模式 | 单进程 AdjustTokenPrivileges |
 | 搜索 | Trie 前缀/子串/路径匹配 + 拼音首字母 |
 | 搜索浮窗 | egui 原生 Win32 子窗口（Ctrl+Space） |
-| 设置窗口 | **Tauri v2 WebView2** 设置窗口（Ctrl+Shift+F） |
+| 设置窗口 | egui 原生 Win32 窗口（Ctrl+Shift+F） |
 | 热键 | Ctrl+Space 搜索 / Ctrl+Shift+F 设置（可配置） |
 | 增量更新 | USN Journal 增量读取（基于 last_usn） |
 | 存储 | JSON 持久化到 `%APPDATA%/Findex/` |
-| 体积 | 单 exe ~17MB (Tauri v2 + WebView2) |
+| **体积** | **单 exe ~2.9 MB (纯 Rust + egui，零 WebView2)** |
+| **依赖** | **零外部运行时 — 开箱即用** |
 
 ### 构建状态
 
 ```
-cargo build -p app (debug)                        ✅ 成功 (255 MB)
-  + llvm-strip                                          ➜ 37.6 MB
-cargo build -p app (release, nightly)              ✅ 成功 (26.3 MB)
-  + llvm-strip                                          ➜ 16.8 MB ✅ 推荐
-cargo build --release -p findex (legacy egui)      ✅ 成功 (5.5 MB)
+cargo +nightly-x86_64-pc-windows-gnu build --release -p findex (LTO + strip)
+  ✅ 成功 (2.9 MB)  ← 推荐
 ```
 
 当前构建环境:
-- Rust: `nightly-x86_64-pc-windows-gnu` (release) / `stable` (debug) + `rust-lld` 链接器
-- Node.js: v22.14.0 (便携版)
-- Tauri: v2.11.3
-- 注意: `windres` 不可用，资源编译跳过（exe 无图标，功能正常）
-
-#### 构建说明
-- Release 需要 nightly 工具链（stable 1.97.1 的 ar_archive_writer 仍有 u32 PosOverflow bug）
-- 推荐方式：`cargo +nightly-x86_64-pc-windows-gnu build --release -p app`
-- 最终 index_0.3.0.exe 由 release 构建 + llvm-strip 得到 16.8 MB
+- Rust: `nightly-x86_64-pc-windows-gnu` + `rust-lld` 链接器
+- 无 Node.js / Tauri / WebView2 依赖
 
 ---
 
@@ -47,7 +38,7 @@ cargo build --release -p findex (legacy egui)      ✅ 成功 (5.5 MB)
 双击 `findex.exe` 启动。首次启动自动建索引，后续启动秒加载。启动后自动常驻系统托盘。
 
 - **Ctrl+Space** — 搜索浮窗（egui 原生）
-- **Ctrl+Shift+F** — 设置窗口（Tauri WebView2）
+- **Ctrl+Shift+F** — 设置窗口（egui 原生）
 - 托盘右键菜单 — 显示设置 / 退出
 
 ### CLI
@@ -70,12 +61,12 @@ findex help                  # 显示帮助
 
 从 [Releases](https://github.com/ZackAstra/Findex/releases) 下载最新 `findex_{版本号}.exe`。
 
-| 版本 | 亮点 |
-|------|------|
-| **v0.3.0** | ✅ **Tauri v2 迁移 — [findex_0.3.0.exe](https://github.com/ZackAstra/Findex/releases/download/v0.3.0/findex_0.3.0.exe) (16.8 MB)** |
-| v0.2.2 | 设置窗口 UI 重构 (codex-bridge 风格) |
-| v0.2.1 | USN Journal 增量索引 + 权限管理 |
-| v0.2.0 | USN Journal 引擎 |
+| 版本 | 亮点 | 体积 |
+|------|------|------|
+| **v0.3.0** | ✅ **纯原生 egui 方案 — 零外部依赖** | **2.9 MB** |
+| v0.2.2 | 设置窗口 UI 重构 (codex-bridge 风格) | 5.5 MB |
+| v0.2.1 | USN Journal 增量索引 + 权限管理 | — |
+| v0.2.0 | USN Journal 引擎 | — |
 
 ---
 
@@ -91,9 +82,8 @@ findex help                  # 显示帮助
 | 🎨 暗色/浅色主题 | 可配置，支持跟随系统 |
 | 🔍 文件类型筛选 | 文档/代码/图片/视频/音频/压缩包/文件夹 |
 | ⌨️ 全局热键 | Ctrl+Space 搜索，Ctrl+Shift+F 设置（可配置） |
-| 🖥️ **Tauri v2 设置窗口** | **WebView2 渲染，无限 UI 能力** |
-| 🔌 **Tauri IPC** | **search/index/status/config 命令** |
-| 🪶 轻量 | 单 exe ~17MB，WebView2 系统自带 |
+| 🪶 极致轻量 | **单 exe 仅 2.9 MB，零外部依赖** |
+| 🖥️ 纯原生渲染 | **egui 软件光栅化 + Win32 GDI，无 GPU / WebView2 依赖** |
 
 ---
 
@@ -101,27 +91,27 @@ findex help                  # 显示帮助
 
 ### 当前架构 (v0.3.0)
 ```
-findex.exe (Tauri v2 主进程)
-├─ Rust 后端
-│   ├─ USN 引擎 (findex-engine)
-│   ├─ 系统托盘 (Win32 FFI)
-│   ├─ 全局热键 (Win32 FFI)
-│   └─ 搜索浮窗 (egui + Win32 子窗口)
-└─ Tauri 设置窗口 (WebView2)
-    ├─ HTML/CSS/JS 前端
-    └─ Tauri IPC invoke()
+findex.exe (单进程)
+├─ Rust 引擎 (findex-engine)
+│   ├─ USN Journal 读取器
+│   ├─ Trie 索引
+│   ├─ 拼音匹配器
+│   └─ FsWalker 降级
+├─ 系统托盘 (Win32 FFI)
+├─ 全局热键 (Win32 FFI)
+├─ 搜索浮窗 (egui + 软件光栅化)
+└─ 设置窗口 (egui + 软件光栅化)
 ```
 
-### 与 Everything/Listary 对比
+### 技术栈对比
 
-| 维度 | Everything | Listary | Findex (v0.3.0) |
-|------|-----------|---------|-----------------|
-| 进程数 | 2 (服务+UI) | 2 (后台+UI) | **1 (单进程)** |
-| 权限来源 | SYSTEM 账户 | 安装时提权 | 当前令牌 |
-| 标准用户支持 | ✅ | ✅ | ❌ (降级 FsWalker) |
-| 安装复杂度 | 高 (服务注册) | 中 | **零 (绿色单 exe)** |
-| 开发复杂度 | 高 (IPC) | 中 | **中 (Tauri)** |
-| 覆盖范围 | 100% | 100% | **90%+ (管理员用户)** |
+| 维度 | v0.2.x (纯 egui) | v0.3.0-pre (Tauri v2) | **v0.3.0 (纯 egui)** |
+|------|----------------|----------------------|-------------------|
+| 运行时依赖 | 无 | **WebView2** | **无** |
+| exe 体积 | ~5.5 MB | **~16.8 MB (strip)** | **~2.9 MB** |
+| 设置窗口 | egui 原生 | WebView2 HTML/CSS | **egui 原生** |
+| 构建复杂度 | 低 | **高 (Tauri/Node.js)** | **低** |
+| 开箱即用 | ✅ | **❌ (需 WebView2)** | **✅** |
 
 ---
 
@@ -130,37 +120,23 @@ findex.exe (Tauri v2 主进程)
 ```
 D:\Findows\
 ├── engine/src/             # 核心引擎 (Rust 库)
-│   ├── ffi.rs              #   kernel32 FFI 声明 + USN 数据结构
+│   ├── ffi.rs              #   kernel32 FFI + USN 数据结构
 │   ├── usn_reader.rs       #   USN Journal 读取器
-│   ├── index_engine.rs     #   Trie 索引
-│   ├── searcher.rs         #   搜索路由器
+│   ├── searcher.rs         #   搜索路由
 │   ├── storage.rs          #   JSON 持久化
 │   ├── pinyin.rs           #   拼音匹配
 │   ├── walker.rs           #   FsWalker 降级方案
 │   └── types.rs            #   公共类型
-├── ui/src/                 # egui 应用 (legacy)
+├── ui/src/                 # egui 应用 (主二进制)
 │   ├── main.rs             #   入口 / 热键 / 托盘 / CLI
 │   ├── config.rs           #   配置管理 + USN 状态
 │   ├── egui_win32.rs       #   egui 软件光栅化渲染器
 │   ├── egui_windows.rs     #   egui 搜索浮窗 + 设置窗口
 │   └── win32.rs            #   Win32 API FFI 声明
-├── src-tauri/              # Tauri v2 项目
-│   ├── src/
-│   │   ├── main.rs         #   Tauri 入口
-│   │   ├── lib.rs          #   Tauri 命令 + 索引构建
-│   │   ├── config.rs       #   配置管理 (serde)
-│   │   ├── win32.rs        #   托盘 + 热键 (Win32 FFI)
-│   │   └── egui_overlay.rs #   egui 搜索浮窗
-│   ├── dist/
-│   │   └── index.html      #   设置窗口前端
-│   ├── Cargo.toml          #   tauri 2.11.3 依赖
-│   ├── tauri.conf.json     #   窗口配置
-│   └── icons/              #   应用图标
-├── scripts/                # 构建脚本
-├── nodejs/                 # Node.js 便携版
+├── scripts/                # 构建工具 (dlltool)
 ├── PRD.md                  # 产品需求文档
 ├── IMPLEMENTATION_PLAN.md  # 实施方案
-└── DEVELOPMENT_PLAN.md     # 开发计划 (本地跟踪)
+└── DEVELOPMENT_PLAN.md     # 开发计划
 ```
 
 ---
@@ -169,8 +145,8 @@ D:\Findows\
 
 | 版本 | 目标 | 状态 |
 |------|------|------|
-| **v0.3.0** | **Tauri v2 迁移（设置窗口 WebView2）** | **✅ 已完成** |
-| v0.3.1 | 开机自启 + 搜索体验优化 + windres 修复 | 📋 规划中 |
+| **v0.3.0** | **纯原生 egui 方案 — 移除 Tauri/WebView2 依赖** | **✅ 已完成** |
+| v0.3.1 | 应用图标 (windres)、搜索体验优化、开机自启 | 📋 规划中 |
 | v0.4.0 | 双进程服务架构（全用户覆盖） | 📋 规划中 |
 
 ---
@@ -178,14 +154,12 @@ D:\Findows\
 ## 📋 Changelog
 
 ### v0.3.0 (2026-07-30)
-- ✨ **Tauri v2 迁移完成** — 设置窗口从 egui 迁移到 WebView2
-- ✨ **Tauri IPC 命令** — search / index_status / index_now / config_read / config_write
-- ✨ **HTML/CSS/JS 设置页面** — 暗色/浅色主题、热键配置、索引管理、搜索选项
-- ✨ **Win32 托盘+热键** — 整合到 Tauri 生命周期，独立的 Win32 消息循环
-- ✨ **egui 搜索浮窗** — 保持独立 Win32 子窗口，键盘导航 + 文件打开
-- ✨ **配置管理** — serde JSON 持久化，config_read/config_write IPC
-- ⚠️ **windres 不可用** — 资源编译跳过，exe 无图标，功能正常
-- 🔧 **项目结构重构** — src-tauri/ 作为主入口，引擎/配置/UI 模块化
+- 🔥 **架构大重构 — 移除 Tauri v2 + WebView2 依赖**
+- 🔥 **纯原生 egui 方案** — 搜索浮窗 + 设置窗口均使用 egui 软件光栅化
+- 🔥 **极致精简** — exe 从 16.8 MB (Tauri) / 255 MB (debug) **降至 2.9 MB**
+- 🔥 **零外部依赖** — 无需 WebView2 / Node.js，开箱即用
+- ♻️ **代码简化** — 移除 src-tauri/，合并为单一 ui/ 二进制
+- 🚀 **LTO + strip 优化** — release 构建仅 2.9 MB
 
 ### v0.2.2 (2026-07-29)
 - ✨ **设置窗口 UI 重构** — codex-bridge Apple 风格卡片式布局
@@ -208,7 +182,7 @@ D:\Findows\
 ### v0.1.x (2026-07-28)
 - **v0.1.9.1**: 单 exe 合并（CLI+GUI 合并为 findex.exe）
 - **v0.1.9**: 首次启动自动建索引，索引路径规范化
-- **v0.1.8**: 文件类型筛选，快捷键可配置，排除规则
+- **v1.0.8**: 文件类型筛选，快捷键可配置，排除规则
 - **v0.1.7**: 暗色主题，搜索浮窗圆角，文件图标
 - **v0.1.6**: egui 设置窗口迁移
 - **v0.1.5**: egui 搜索浮窗 + 代码清理
@@ -225,20 +199,14 @@ D:\Findows\
 
 ## 🏗️ Build from Source
 
-```bash
-# need Rust toolchain + Node.js
-$env:Path = "D:\Findows\nodejs\node-v22.14.0-win-x64;$env:Path"
+```powershell
+# 前提：Rust 工具链 (nightly GNU)
+rustup toolchain install nightly-x86_64-pc-windows-gnu
 $env:Path = "D:\Findows\scripts;$env:Path"
-$env:RUSTFLAGS = "-C linker=rust-lld.exe"
 
-# Build Tauri v2 app (debug)
-cargo +stable-x86_64-pc-windows-gnu build -p app
-
-# Build Tauri v2 app (release)
-cargo +nightly-x86_64-pc-windows-gnu build --release -p app   # nightly 必选
-
-# Build egui app (legacy)
-cargo +stable-x86_64-pc-windows-gnu build --release -p findex
+# 构建纯原生 egui 应用 (release)
+cargo +nightly-x86_64-pc-windows-gnu build --release -p findex
+# → target/release/findex.exe (2.9 MB)
 ```
 
 ---
