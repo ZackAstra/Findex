@@ -19,6 +19,7 @@ target/
 
 # Research files
 *.html
+!src-tauri/dist/*.html
 
 # Database
 *.db
@@ -43,3 +44,8 @@ nodejs/
 src-tauri/node_modules/
 src-tauri/.tauri/
 *.crate
+
+# Node.js portable
+node_portable.zip
+src-tauri/windres.py
+src-tauri/windres.cmd

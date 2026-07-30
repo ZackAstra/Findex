@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Findex Settings</title>
+<style>
+:root {
+  --bg: #1c1c1e;
+  --card: #2c2c2e;
+  --card-hover: #3a3a3c;
+  --text: #f5f5f7;
+  --text-secondary: #98989d;
+  --accent: #0a84ff;
+  --accent-hover: #409cff;
+  --danger: #ff453a;
+  --success: #30d158;
+  --border: #38383a;
+  --radius: 10px;
+  --shadow: 0 8px 32px rgba(0,0,0,0.4);
+}
+.light {
+  --bg: #f5f5f7;
+  --card: #ffffff;
+  --card-hover: #f0f0f2;
+  --text: #1d1d1f;
+  --text-secondary: #86868b;
+  --accent: #0071e3;
+  --accent-hover: #0077ed;
+  --border: #d2d2d7;
+  --shadow: 0 8px 32px rgba(0,0,0,0.1);
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  padding: 20px;
+  transition: background 0.3s, color 0.3s;
+  -webkit-user-select: none;
+  user-select: none;
+}
+.container { max-width: 720px; margin: 0 auto; }
+h1 {
+  font-size: 24px;
+  font-weight: 700;
+  margin-bottom: 24px;
+  letter-spacing: -0.5px;
+}
+.card {
+  background: var(--card);
+  border-radius: var(--radius);
+  padding: 20px;
+  margin-bottom: 16px;
+  box-shadow: var(--shadow);
+  border: 1px solid var(--border);
+  transition: background 0.3s, border-color 0.3s;
+}
+.card-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--accent);
+  margin-bottom: 14px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 0;
+  min-height: 36px;
+}
+.row + .row { border-top: 1px solid var(--border); }
+.label { font-size: 13px; color: var(--text); }
+.label-desc { font-size: 11px; color: var(--text-secondary); margin-top: 2px; }
+select, input[type="text"], input[type="number"] {
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.2s;
+  font-family: inherit;
+  max-width: 200px;
+}
+select:focus, input:focus { border-color: var(--accent); }
+input[type="text"] { width: 180px; }
+input[type="number"] { width: 80px; text-align: center; }
+.btn {
+  padding: 6px 16px;
+  border: none;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: opacity 0.2s, transform 0.1s;
+  font-family: inherit;
+}
+.btn:active { transform: scale(0.96); }
+.btn-primary { background: var(--accent); color: #fff; }
+.btn-primary:hover { opacity: 0.85; }
+.btn-success { background: var(--success); color: #fff; }
+.btn-success:hover { opacity: 0.85; }
+.btn-danger { background: var(--danger); color: #fff; }
+.btn-danger:hover { opacity: 0.85; }
+.btn-secondary { background: var(--card-hover); color: var(--text); }
+.btn-secondary:hover { opacity: 0.8; }
+.btn-sm { padding: 4px 10px; font-size: 12px; }
+.tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--card-hover);
+  border-radius: 4px;
+  padding: 3px 8px;
+  font-size: 12px;
+  margin: 2px;
+}
+.tag .remove { cursor: pointer; opacity: 0.5; font-size: 14px; }
+.tag .remove:hover { opacity: 1; }
+.tag-list { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.checkbox-row { display: flex; align-items: center; gap: 8px; }
+.checkbox-row input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--accent); cursor: pointer; }
+.status-bar {
+  font-size: 12px;
+  color: var(--text-secondary);
+  padding: 12px 0;
+  text-align: center;
+}
+.tabs {
+  display: flex;
+  gap: 0;
+  margin-bottom: 20px;
+  background: var(--card);
+  border-radius: var(--radius);
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+.tab {
+  flex: 1;
+  padding: 10px;
+  text-align: center;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  transition: background 0.2s, color 0.2s;
+  color: var(--text-secondary);
+  border: none;
+  background: transparent;
+  font-family: inherit;
+}
+.tab:hover { background: var(--card-hover); }
+.tab.active { color: var(--accent); background: var(--card-hover); }
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+.hotkey-input {
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 13px;
+  min-width: 140px;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.2s;
+  font-family: inherit;
+}
+.hotkey-input:hover { border-color: var(--accent); }
+.hotkey-input.listening { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(10,132,255,0.3); }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>⚙️ Findex Settings</h1>
+
+  <div class="tabs" id="tabs">
+    <button class="tab active" data-tab="general">General</button>
+    <button class="tab" data-tab="index">Index</button>
+    <button class="tab" data-tab="search">Search</button>
+    <button class="tab" data-tab="about">About</button>
+  </div>
+
+  <!-- General Tab -->
+  <div class="tab-content active" id="tab-general">
+    <div class="card">
+      <div class="card-title">🎨 Appearance</div>
+      <div class="row">
+        <div><div class="label">Theme</div><div class="label-desc">Choose between light, dark, or system theme</div></div>
+        <select id="theme"><option value="light">Light</option><option value="dark">Dark</option><option value="system">System</option></select>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">⌨️ Hotkeys</div>
+      <div class="row">
+        <div><div class="label">Search Hotkey</div><div class="label-desc">Global shortcut to open search overlay</div></div>
+        <input type="text" class="hotkey-input" id="search-hotkey" readonly placeholder="Click to set...">
+      </div>
+      <div class="row">
+        <div><div class="label">Settings Hotkey</div><div class="label-desc">Global shortcut to open settings</div></div>
+        <input type="text" class="hotkey-input" id="settings-hotkey" readonly placeholder="Click to set...">
+      </div>
+    </div>
+  </div>
+
+  <!-- Index Tab -->
+  <div class="tab-content" id="tab-index">
+    <div class="card">
+      <div class="card-title">📂 Index Directories</div>
+      <div class="row">
+        <div class="label">Directories to index</div>
+        <div style="display:flex;gap:6px;">
+          <input type="text" id="index-dir-input" placeholder="C:\">
+          <button class="btn btn-primary btn-sm" id="add-dir-btn">+ Add</button>
+        </div>
+      </div>
+      <div class="tag-list" id="index-dirs"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">🚫 Exclude Patterns</div>
+      <div class="row">
+        <div class="label">Patterns to exclude from indexing</div>
+        <div style="display:flex;gap:6px;">
+          <input type="text" id="exclude-pattern-input" placeholder="node_modules">
+          <button class="btn btn-primary btn-sm" id="add-pattern-btn">+ Add</button>
+        </div>
+      </div>
+      <div class="tag-list" id="exclude-patterns"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">⚡ Index Actions</div>
+      <div class="row">
+        <div><div class="label">Index Now</div><div class="label-desc">Force re-index all directories</div></div>
+        <button class="btn btn-primary" id="index-now-btn">Index Now</button>
+      </div>
+      <div class="row">
+        <div><div class="label">Index Status</div></div>
+        <div id="index-status" style="font-size:13px;color:var(--text-secondary);text-align:right;">Loading...</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Search Tab -->
+  <div class="tab-content" id="tab-search">
+    <div class="card">
+      <div class="card-title">🔍 Search Options</div>
+      <div class="checkbox-row row">
+        <label class="label" for="enable-pinyin">Enable Pinyin Search</label>
+        <input type="checkbox" id="enable-pinyin">
+      </div>
+      <div class="checkbox-row row">
+        <label class="label" for="enable-fuzzy">Enable Fuzzy Search</label>
+        <input type="checkbox" id="enable-fuzzy">
+      </div>
+      <div class="checkbox-row row">
+        <label class="label" for="show-hidden">Show Hidden Files</label>
+        <input type="checkbox" id="show-hidden">
+      </div>
+      <div class="checkbox-row row">
+        <label class="label" for="auto-index">Auto-Index on Startup</label>
+        <input type="checkbox" id="auto-index">
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">📊 Results</div>
+      <div class="row">
+        <div><div class="label">Max Results</div><div class="label-desc">Maximum number of search results to show</div></div>
+        <input type="number" id="max-results" min="10" max="500" value="50">
+      </div>
+    </div>
+  </div>
+
+  <!-- About Tab -->
+  <div class="tab-content" id="tab-about">
+    <div class="card" style="text-align:center;padding:32px;">
+      <div style="font-size:48px;margin-bottom:12px;">🔍</div>
+      <div style="font-size:20px;font-weight:700;margin-bottom:4px;">Findex</div>
+      <div style="font-size:13px;color:var(--text-secondary);margin-bottom:16px;">Fast Windows File Search Tool</div>
+      <div style="font-size:12px;color:var(--text-secondary);">v0.3.0 · Tauri v2 + egui + WebView2</div>
+      <div style="font-size:12px;color:var(--text-secondary);margin-top:12px;">
+        USN Journal powered · Zero external dependencies · Single exe
+      </div>
+    </div>
+  </div>
+
+  <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">
+    <button class="btn btn-success" id="save-btn">💾 Save</button>
+    <button class="btn btn-danger" id="cancel-btn">✕ Cancel</button>
+  </div>
+
+  <div class="status-bar" id="status-bar"></div>
+</div>
+
+<script>
+const invoke = window.__TAURI__?.core?.invoke || (async () => { console.log("TAURI not available"); return {}; });
+
+let config = {};
+let listeningHotkey = null;
+
+async function loadConfig() {
+  try {
+    config = await invoke("config_read");
+    applyConfig();
+  } catch (e) {
+    console.error("Failed to load config:", e);
+    config = {
+      theme: "system",
+      search_hotkey: "Ctrl+Space",
+      settings_hotkey: "Ctrl+Shift+F",
+      index_dirs: ["C:\\"],
+      exclude_patterns: ["node_modules", ".git", "__pycache__"],
+      max_results: 50,
+      enable_pinyin: true,
+      enable_fuzzy: true,
+      show_hidden: false,
+      auto_index: true
+    };
+    applyConfig();
+  }
+}
+
+function applyConfig() {
+  document.getElementById("theme").value = config.theme || "system";
+  document.getElementById("search-hotkey").value = config.search_hotkey || "Ctrl+Space";
+  document.getElementById("settings-hotkey").value = config.settings_hotkey || "Ctrl+Shift+F";
+  document.getElementById("max-results").value = config.max_results || 50;
+  document.getElementById("enable-pinyin").checked = config.enable_pinyin !== false;
+  document.getElementById("enable-fuzzy").checked = config.enable_fuzzy !== false;
+  document.getElementById("show-hidden").checked = config.show_hidden === true;
+  document.getElementById("auto-index").checked = config.auto_index !== false;
+
+  renderTags("index-dirs", config.index_dirs || []);
+  renderTags("exclude-patterns", config.exclude_patterns || []);
+  loadIndexStatus();
+}
+
+function renderTags(containerId, items) {
+  const container = document.getElementById(containerId);
+  container.innerHTML = items.map((item, i) =>
+    `<span class="tag">${escapeHtml(item)}<span class="remove" data-container="${containerId}" data-index="${i}">×</span></span>`
+  ).join("");
+  container.querySelectorAll(".remove").forEach(el => {
+    el.addEventListener("click", () => {
+      const idx = parseInt(el.dataset.index);
+      const key = el.dataset.container === "index-dirs" ? "index_dirs" : "exclude_patterns";
+      config[key].splice(idx, 1);
+      renderTags(el.dataset.container, config[key]);
+    });
+  });
+}
+
+function escapeHtml(str) {
+  const div = document.createElement("div");
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+async function loadIndexStatus() {
+  try {
+    const status = await invoke("index_status");
+    document.getElementById("index-status").innerHTML =
+      `📁 ${status.total_files} files · ${status.total_folders} folders<br>` +
+      `<span style="font-size:11px;">Volumes: ${(status.indexed_volumes || []).join(", ") || "N/A"}</span>`;
+  } catch (e) {
+    document.getElementById("index-status").textContent = "Index not loaded";
+  }
+}
+
+// --- Hotkey capture ---
+document.querySelectorAll(".hotkey-input").forEach(input => {
+  input.addEventListener("click", () => {
+    if (listeningHotkey) return;
+    listeningHotkey = input.id;
+    input.classList.add("listening");
+    input.value = "Press keys...";
+  });
+});
+
+document.addEventListener("keydown", (e) => {
+  if (!listeningHotkey) return;
+  e.preventDefault();
+  const parts = [];
+  if (e.ctrlKey) parts.push("Ctrl");
+  if (e.altKey) parts.push("Alt");
+  if (e.shiftKey) parts.push("Shift");
+  if (e.metaKey) parts.push("Win");
+
+  const keyMap = { " ": "Space", "Escape": "Esc", "Enter": "Enter", "Tab": "Tab", "Backspace": "Backspace", "Delete": "Delete" };
+  let keyName = keyMap[e.key] || e.key;
+  if (keyName.length === 1) keyName = keyName.toUpperCase();
+
+  parts.push(keyName);
+  const hotkey = parts.join("+");
+
+  const input = document.getElementById(listeningHotkey);
+  input.value = hotkey;
+  input.classList.remove("listening");
+
+  const key = listeningHotkey === "search-hotkey" ? "search_hotkey" : "settings_hotkey";
+  config[key] = hotkey;
+  listeningHotkey = null;
+});
+
+// --- Tab switching ---
+document.querySelectorAll(".tab").forEach(tab => {
+  tab.addEventListener("click", () => {
+    document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+    document.querySelectorAll(".tab-content").forEach(t => t.classList.remove("active"));
+    tab.classList.add("active");
+    document.getElementById("tab-" + tab.dataset.tab).classList.add("active");
+  });
+});
+
+// --- Theme change ---
+document.getElementById("theme").addEventListener("change", () => {
+  config.theme = document.getElementById("theme").value;
+  applyThemeClass(config.theme);
+});
+
+function applyThemeClass(theme) {
+  if (theme === "light") document.body.classList.add("light");
+  else if (theme === "dark") document.body.classList.remove("light");
+  else {
+    const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+    if (prefersDark) document.body.classList.remove("light");
+    else document.body.classList.add("light");
+  }
+}
+
+// --- Add dir/pattern ---
+document.getElementById("add-dir-btn").addEventListener("click", () => {
+  const input = document.getElementById("index-dir-input");
+  if (input.value.trim()) {
+    config.index_dirs.push(input.value.trim());
+    renderTags("index-dirs", config.index_dirs);
+    input.value = "";
+  }
+});
+document.getElementById("add-pattern-btn").addEventListener("click", () => {
+  const input = document.getElementById("exclude-pattern-input");
+  if (input.value.trim()) {
+    config.exclude_patterns.push(input.value.trim());
+    renderTags("exclude-patterns", config.exclude_patterns);
+    input.value = "";
+  }
+});
+["index-dir-input", "exclude-pattern-input"].forEach(id => {
+  document.getElementById(id).addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      if (id === "index-dir-input") document.getElementById("add-dir-btn").click();
+      else document.getElementById("add-pattern-btn").click();
+    }
+  });
+});
+
+// --- Checkboxes ---
+["enable-pinyin", "enable-fuzzy", "show-hidden", "auto-index"].forEach(id => {
+  document.getElementById(id).addEventListener("change", () => {
+    const key = id.replace(/-/g, "_");
+    config[key] = document.getElementById(id).checked;
+  });
+});
+document.getElementById("max-results").addEventListener("change", () => {
+  config.max_results = parseInt(document.getElementById("max-results").value) || 50;
+});
+
+// --- Actions ---
+document.getElementById("index-now-btn").addEventListener("click", async () => {
+  document.getElementById("index-now-btn").textContent = "⏳ Indexing...";
+  document.getElementById("index-now-btn").disabled = true;
+  try {
+    await invoke("index_now");
+    setStatus("Indexing started in background...");
+    setTimeout(loadIndexStatus, 2000);
+  } catch (e) {
+    setStatus("Error: " + e);
+  }
+  setTimeout(() => {
+    document.getElementById("index-now-btn").textContent = "Index Now";
+    document.getElementById("index-now-btn").disabled = false;
+  }, 3000);
+});
+
+document.getElementById("save-btn").addEventListener("click", async () => {
+  try {
+    config.theme = document.getElementById("theme").value;
+    config.max_results = parseInt(document.getElementById("max-results").value) || 50;
+    config.enable_pinyin = document.getElementById("enable-pinyin").checked;
+    config.enable_fuzzy = document.getElementById("enable-fuzzy").checked;
+    config.show_hidden = document.getElementById("show-hidden").checked;
+    config.auto_index = document.getElementById("auto-index").checked;
+
+    await invoke("config_write", { newConfig: config });
+    setStatus("✅ Settings saved successfully");
+    setTimeout(() => { setStatus(""); }, 3000);
+  } catch (e) {
+    setStatus("❌ Error saving: " + e);
+  }
+});
+
+document.getElementById("cancel-btn").addEventListener("click", () => {
+  loadConfig();
+  setStatus("Settings reverted");
+  setTimeout(() => { setStatus(""); }, 2000);
+});
+
+function setStatus(msg) {
+  document.getElementById("status-bar").textContent = msg;
+}
+
+// --- Init ---
+applyThemeClass(config.theme || "system");
+window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
+  if (config.theme === "system") applyThemeClass("system");
+});
+
+loadConfig();
+</script>
+</body>
+</html>
