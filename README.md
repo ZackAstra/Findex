@@ -16,7 +16,7 @@
 | 热键 | Ctrl+Space 搜索 / Ctrl+Shift+F 设置（可配置） |
 | 增量更新 | USN Journal 增量读取（基于 last_usn） |
 | 存储 | JSON 持久化到 `%APPDATA%/Findex/` |
-| 体积 | 单 exe ~15MB (Tauri v2 + WebView2) |
+| 体积 | 单 exe ~17MB (Tauri v2 + WebView2) |
 
 ### 构建状态
 
@@ -29,7 +29,7 @@ cargo build --release -p findex (legacy egui)      ✅ 成功 (5.5 MB)
 ```
 
 当前构建环境:
-- Rust: `stable-x86_64-pc-windows-gnu` + `rust-lld` 链接器
+- Rust: `nightly-x86_64-pc-windows-gnu` (release) / `stable` (debug) + `rust-lld` 链接器
 - Node.js: v22.14.0 (便携版)
 - Tauri: v2.11.3
 - 注意: `windres` 不可用，资源编译跳过（exe 无图标，功能正常）
@@ -37,7 +37,7 @@ cargo build --release -p findex (legacy egui)      ✅ 成功 (5.5 MB)
 #### 构建说明
 - Release 需要 nightly 工具链（stable 1.97.1 的 ar_archive_writer 仍有 u32 PosOverflow bug）
 - 推荐方式：`cargo +nightly-x86_64-pc-windows-gnu build --release -p app`
-- 最终 pp-stripped.exe 由 release 构建 + llvm-strip 得到 16.8 MB
+- 最终 index_0.3.0.exe 由 release 构建 + llvm-strip 得到 16.8 MB
 
 ---
 
@@ -68,11 +68,11 @@ findex help                  # 显示帮助
 
 ## 📦 Downloads
 
-从 [Releases](https://github.com/ZackAstra/Findex/releases) 下载最新 `findex.exe`。
+从 [Releases](https://github.com/ZackAstra/Findex/releases) 下载最新 `findex_{版本号}.exe`。
 
 | 版本 | 亮点 |
 |------|------|
-| **v0.3.0** | ✅ **Tauri v2 迁移 — [app-stripped.exe](https://github.com/ZackAstra/Findex/releases/download/v0.3.0/app-stripped.exe) (16.8 MB)** |
+| **v0.3.0** | ✅ **Tauri v2 迁移 — [findex_0.3.0.exe](https://github.com/ZackAstra/Findex/releases/download/v0.3.0/findex_0.3.0.exe) (16.8 MB)** |
 | v0.2.2 | 设置窗口 UI 重构 (codex-bridge 风格) |
 | v0.2.1 | USN Journal 增量索引 + 权限管理 |
 | v0.2.0 | USN Journal 引擎 |
@@ -93,7 +93,7 @@ findex help                  # 显示帮助
 | ⌨️ 全局热键 | Ctrl+Space 搜索，Ctrl+Shift+F 设置（可配置） |
 | 🖥️ **Tauri v2 设置窗口** | **WebView2 渲染，无限 UI 能力** |
 | 🔌 **Tauri IPC** | **search/index/status/config 命令** |
-| 🪶 轻量 | 单 exe ~15MB，WebView2 系统自带 |
+| 🪶 轻量 | 单 exe ~17MB，WebView2 系统自带 |
 
 ---
 
@@ -235,7 +235,7 @@ $env:RUSTFLAGS = "-C linker=rust-lld.exe"
 cargo +stable-x86_64-pc-windows-gnu build -p app
 
 # Build Tauri v2 app (release)
-cargo +stable-x86_64-pc-windows-gnu build --release -p app
+cargo +nightly-x86_64-pc-windows-gnu build --release -p app   # nightly 必选
 
 # Build egui app (legacy)
 cargo +stable-x86_64-pc-windows-gnu build --release -p findex

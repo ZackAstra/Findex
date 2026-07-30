@@ -49,3 +49,6 @@ src-tauri/.tauri/
 node_portable.zip
 src-tauri/windres.py
 src-tauri/windres.cmd
+# Proxy setup scripts (local only)
+_setup_proxy.ps1
+_write_profile.py
