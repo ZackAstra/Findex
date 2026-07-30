@@ -1,6 +1,7 @@
-﻿#![allow(non_snake_case)]
+#![allow(non_snake_case)]
 #![allow(unused_unsafe)]
 #![allow(dead_code)]
+#![windows_subsystem = "windows"]
 
 /// Findex - Fast Windows file search tool
 /// Single binary: no args → GUI/tray mode, CLI commands → CLI mode
@@ -46,6 +47,7 @@ fn main() {
 
     // GUI / tray mode
     unsafe {
+        SetProcessDPIAware();
         let hinstance = GetModuleHandleW(std::ptr::null());
         if hinstance.is_null() {
             eprintln!("Failed to get module handle");
@@ -368,13 +370,11 @@ unsafe fn register_hotkeys(hwnd: HWND) {
     // Register search hotkey
     if let Some((mods, vk)) = config::parse_hotkey(&cfg.hotkey_search) {
         RegisterHotKey(hwnd, HOTKEY_ID_SEARCH, mods, vk);
-        eprintln!("Search hotkey: {}", cfg.hotkey_search);
     }
 
     // Register settings hotkey
     if let Some((mods, vk)) = config::parse_hotkey(&cfg.hotkey_settings) {
         RegisterHotKey(hwnd, HOTKEY_ID_SETTINGS, mods, vk);
-        eprintln!("Settings hotkey: {}", cfg.hotkey_settings);
     }
 }
 

@@ -1,4 +1,4 @@
-﻿//! Raw Win32 API FFI declarations for Findex UI.
+//! Raw Win32 API FFI declarations for Findex UI.
 //! Zero external dependencies - pure FFI.
 
 #![allow(non_snake_case, non_camel_case_types, dead_code)]
@@ -130,6 +130,11 @@ pub const WM_CHAR: UINT = 0x0102;
 pub const WM_LBUTTONDOWN: UINT = 0x0201;
 pub const WM_LBUTTONUP: UINT = 0x0202;
 pub const WM_MOUSEMOVE: UINT = 0x0200;
+pub const WM_RBUTTONDOWN: UINT = 0x0204;
+pub const WM_RBUTTONUP: UINT = 0x0205;
+pub const WM_MBUTTONDOWN: UINT = 0x0207;
+pub const WM_MBUTTONUP: UINT = 0x0208;
+pub const WM_MOUSEWHEEL: UINT = 0x020A;
 pub const WM_NCLBUTTONDOWN: UINT = 0x00A1;
 pub const WM_NCHITTEST: UINT = 0x0084;
 pub const WM_GETMINMAXINFO: UINT = 0x0024;
@@ -155,6 +160,7 @@ pub const NIM_DELETE: UINT = 2;
 pub const NIF_MESSAGE: UINT = 0x00000001;
 pub const NIF_ICON: UINT = 0x00000002;
 pub const NIF_TIP: UINT = 0x00000004;
+pub const NIF_INFO: UINT = 0x00000010;
 
 // NOTIFYICONDATA struct
 #[repr(C)]
@@ -757,6 +763,7 @@ pub struct MSLLHOOKSTRUCT {
 #[link(name = "comdlg32")]
 extern "system" {
     pub fn GetModuleHandleW(lpModuleName: LPCWSTR) -> HINSTANCE;
+    pub fn SetProcessDPIAware() -> BOOL;
     pub fn RegisterClassExW(lpwcx: *const WNDCLASSEXW) -> ATOM;
     pub fn UnregisterClassW(lpClassName: LPCWSTR, hInstance: HINSTANCE) -> BOOL;
     pub fn CreateWindowExW(

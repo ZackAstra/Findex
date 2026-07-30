@@ -1,9 +1,143 @@
-﻿/// Egui-based windows for Findex.
+/// Egui-based windows for Findex.
 /// Search overlay and settings window using egui UI.
 
 use crate::win32::*;
 use crate::SEARCHER;
 use crate::egui_win32::EguiRenderer;
+
+use std::cell::Cell;
+use std::cell::RefCell;
+
+thread_local! {
+    static MOUSE_POS: Cell<(f32, f32)> = Cell::new((-1.0, -1.0));
+    static MOUSE_DOWN: Cell<bool> = Cell::new(false);
+    static SCROLL_DELTA: Cell<f32> = Cell::new(0.0);
+    static EGUI_EVENTS: RefCell<Vec<egui::Event>> = RefCell::new(Vec::new());
+}
+
+fn win32_vk_to_egui_key(vk: u32) -> Option<egui::Key> {
+    use egui::Key;
+    Some(match vk {
+        0x08 => Key::Backspace, 0x09 => Key::Tab, 0x0D => Key::Enter,
+        0x1B => Key::Escape, 0x20 => Key::Space,
+        0x21 => Key::PageUp, 0x22 => Key::PageDown, 0x23 => Key::End, 0x24 => Key::Home,
+        0x25 => Key::ArrowLeft, 0x26 => Key::ArrowUp, 0x27 => Key::ArrowRight, 0x28 => Key::ArrowDown,
+        0x2D => Key::Insert, 0x2E => Key::Delete,
+        0x30 => Key::Num0, 0x31 => Key::Num1, 0x32 => Key::Num2, 0x33 => Key::Num3, 0x34 => Key::Num4,
+        0x35 => Key::Num5, 0x36 => Key::Num6, 0x37 => Key::Num7, 0x38 => Key::Num8, 0x39 => Key::Num9,
+        0x41 => Key::A, 0x42 => Key::B, 0x43 => Key::C, 0x44 => Key::D, 0x45 => Key::E,
+        0x46 => Key::F, 0x47 => Key::G, 0x48 => Key::H, 0x49 => Key::I, 0x4A => Key::J,
+        0x4B => Key::K, 0x4C => Key::L, 0x4D => Key::M, 0x4E => Key::N, 0x4F => Key::O,
+        0x50 => Key::P, 0x51 => Key::Q, 0x52 => Key::R, 0x53 => Key::S, 0x54 => Key::T,
+        0x55 => Key::U, 0x56 => Key::V, 0x57 => Key::W, 0x58 => Key::X, 0x59 => Key::Y, 0x5A => Key::Z,
+        0x70 => Key::F1, 0x71 => Key::F2, 0x72 => Key::F3, 0x73 => Key::F4,
+        0x74 => Key::F5, 0x75 => Key::F6, 0x76 => Key::F7, 0x77 => Key::F8,
+        0x78 => Key::F9, 0x79 => Key::F10, 0x7A => Key::F11, 0x7B => Key::F12,
+        _ => return None,
+    })
+}
+
+fn collect_egui_input(width: f32, height: f32) -> egui::RawInput {
+    let events = EGUI_EVENTS.with(|e| e.borrow_mut().drain(..).collect::<Vec<_>>());
+    let scroll = SCROLL_DELTA.with(|s| s.replace(0.0));
+    let mouse_pos = MOUSE_POS.with(|p| {
+        let (x, y) = p.get();
+        if x >= 0.0 && y >= 0.0 { Some(egui::pos2(x, y)) } else { None }
+    });
+    let mut all_events = events;
+    if scroll != 0.0 {
+        all_events.push(egui::Event::Scroll(egui::vec2(0.0, scroll)));
+    }
+    if let Some(pos) = mouse_pos {
+        all_events.push(egui::Event::PointerMoved(pos));
+    }
+    egui::RawInput {
+        screen_rect: Some(egui::Rect::from_min_size(egui::pos2(0.0, 0.0), egui::vec2(width, height))),
+        events: all_events,
+        ..Default::default()
+    }
+}
+
+fn handle_egui_input_msg(msg: u32, wparam: usize, lparam: isize) -> Option<LRESULT> {
+    if msg == WM_LBUTTONDOWN || msg == WM_RBUTTONDOWN || msg == WM_MBUTTONDOWN {
+        MOUSE_DOWN.with(|d| d.set(true));
+        let x = (lparam as u16) as f32;
+        let y = ((lparam as u32) >> 16) as f32;
+        MOUSE_POS.with(|p| p.set((x, y)));
+        let button = if msg == WM_RBUTTONDOWN {
+            egui::PointerButton::Secondary
+        } else if msg == WM_MBUTTONDOWN {
+            egui::PointerButton::Middle
+        } else {
+            egui::PointerButton::Primary
+        };
+        EGUI_EVENTS.with(|e| e.borrow_mut().push(egui::Event::PointerButton {
+            pos: egui::pos2(x, y), button, pressed: true,
+            modifiers: egui::Modifiers::default(),
+        }));
+        return Some(0);
+    }
+    if msg == WM_LBUTTONUP || msg == WM_RBUTTONUP || msg == WM_MBUTTONUP {
+        MOUSE_DOWN.with(|d| d.set(false));
+        let x = (lparam as u16) as f32;
+        let y = ((lparam as u32) >> 16) as f32;
+        let button = if msg == WM_RBUTTONUP {
+            egui::PointerButton::Secondary
+        } else if msg == WM_MBUTTONUP {
+            egui::PointerButton::Middle
+        } else {
+            egui::PointerButton::Primary
+        };
+        EGUI_EVENTS.with(|e| e.borrow_mut().push(egui::Event::PointerButton {
+            pos: egui::pos2(x, y), button, pressed: false,
+            modifiers: egui::Modifiers::default(),
+        }));
+        return Some(0);
+    }
+    if msg == WM_MOUSEMOVE {
+        let x = (lparam as u16) as f32;
+        let y = ((lparam as u32) >> 16) as f32;
+        MOUSE_POS.with(|p| p.set((x, y)));
+        return None; // let DefWindowProc handle it
+    }
+    if msg == WM_MOUSEWHEEL {
+        let delta = ((wparam as i32) >> 16) as f32 / 120.0;
+        SCROLL_DELTA.with(|s| s.set(s.get() + delta * 100.0));
+        return Some(0);
+    }
+    if msg == WM_KEYDOWN {
+        let vk = wparam as u32;
+        if let Some(key) = win32_vk_to_egui_key(vk) {
+            EGUI_EVENTS.with(|e| e.borrow_mut().push(egui::Event::Key {
+                key, pressed: true,
+                repeat: (lparam as u32 & 0x40000000) != 0,
+                modifiers: egui::Modifiers::default(),
+                physical_key: None,
+            }));
+        }
+        return Some(0);
+    }
+    if msg == WM_KEYUP {
+        let vk = wparam as u32;
+        if let Some(key) = win32_vk_to_egui_key(vk) {
+            EGUI_EVENTS.with(|e| e.borrow_mut().push(egui::Event::Key {
+                key, pressed: false, repeat: false,
+                modifiers: egui::Modifiers::default(),
+                physical_key: None,
+            }));
+        }
+        return Some(0);
+    }
+    if msg == WM_CHAR {
+        if let Some(c) = char::from_u32(wparam as u32) {
+            if !c.is_control() {
+                EGUI_EVENTS.with(|e| e.borrow_mut().push(egui::Event::Text(c.to_string())));
+            }
+        }
+        return Some(0);
+    }
+    None
+}
 #[allow(unused_imports)]
 use crate::config::{
     Theme, apply_theme, SearchFilter,
@@ -125,6 +259,11 @@ unsafe extern "system" fn search_wnd_proc(
     hwnd: HWND, msg: UINT, wparam: WPARAM, lparam: LPARAM,
 ) -> LRESULT {
     match msg {
+                _ if handle_egui_input_msg(msg, wparam, lparam).is_some() => {
+            let result = handle_egui_input_msg(msg, wparam, lparam);
+            InvalidateRect(hwnd, std::ptr::null(), 0);
+            result.unwrap_or_else(|| DefWindowProcW(hwnd, msg, wparam, lparam))
+        }
         WM_PAINT => {
             let state_ptr = GetWindowLongPtrW(hwnd, 0) as *mut EguiWindowState;
             if state_ptr.is_null() {
@@ -139,13 +278,7 @@ unsafe extern "system" fn search_wnd_proc(
             let height = (rect.bottom - rect.top) as usize;
             if width > 0 && height > 0 {
                 state.renderer.resize(width, height);
-                let input = egui::RawInput {
-                    screen_rect: Some(egui::Rect::from_min_size(
-                        egui::pos2(0.0, 0.0),
-                        egui::vec2(width as f32, height as f32),
-                    )),
-                    ..Default::default()
-                };
+                let input = collect_egui_input(width as f32, height as f32);
                 let output = state.ctx.run(input, |ctx| {
                     egui::CentralPanel::default()
                         .frame(egui::Frame::none().fill(ctx.style().visuals.window_fill()))
@@ -487,6 +620,11 @@ unsafe extern "system" fn settings_wnd_proc(
     hwnd: HWND, msg: UINT, wparam: WPARAM, lparam: LPARAM,
 ) -> LRESULT {
     match msg {
+                _ if handle_egui_input_msg(msg, wparam, lparam).is_some() => {
+            let result = handle_egui_input_msg(msg, wparam, lparam);
+            InvalidateRect(hwnd, std::ptr::null(), 0);
+            result.unwrap_or_else(|| DefWindowProcW(hwnd, msg, wparam, lparam))
+        }
         WM_PAINT => {
             let state_ptr = GetWindowLongPtrW(hwnd, 0) as *mut SettingsState;
             if state_ptr.is_null() { return DefWindowProcW(hwnd, msg, wparam, lparam); }
