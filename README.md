@@ -21,8 +21,9 @@
 ### 构建状态
 
 ```
-cargo build -p app (debug)    ✅ 成功 (255 MB)
-cargo build -p app (release)  ✅ 成功 (见下方)
+cargo build -p app (debug)                        ✅ 成功 (255 MB)
+cargo build -p app (release)                      ❌ rustc ICE (需要 MSVC 工具链)
+cargo build --release -p findex (legacy egui)      ✅ 成功 (5.5 MB)
 ```
 
 当前构建环境:
@@ -30,6 +31,11 @@ cargo build -p app (release)  ✅ 成功 (见下方)
 - Node.js: v22.14.0 (便携版)
 - Tauri: v2.11.3
 - 注意: `windres` 不可用，资源编译跳过（exe 无图标，功能正常）
+
+#### 已知构建问题
+- **❌ Release 构建（Tauri v2）**: rustc ICE — ar_archive_writer 在 rust-lld + windows-sys 大特性集下溢出
+  - 临时方案：使用 cargo build -p app Debug 构建
+  - 修复方案：切换到 x86_64-pc-windows-msvc 工具链（需要 VS Build Tools 2022）
 
 ---
 
