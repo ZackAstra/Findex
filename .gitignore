@@ -52,3 +52,5 @@ src-tauri/windres.cmd
 # Proxy setup scripts (local only)
 _setup_proxy.ps1
 _write_profile.py
+findex_*.zip
+findex_*.exe
