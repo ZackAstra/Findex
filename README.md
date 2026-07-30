@@ -22,10 +22,9 @@
 
 ```
 cargo build -p app (debug)                        ✅ 成功 (255 MB)
-  + llvm-strip                                          ➜ 37.6 MB ✅ 可发布
-cargo build -p app (release)                      ❌ rustc ICE - ar_archive_writer PosOverflow
-  ⚠️ 已知 bug: rustc 1.97.1 u32 溢出，需要 rustc ≥ 1.79 或 MSVC 工具链
-  临时方案: debug + strip 获得 37.6 MB 精简版
+  + llvm-strip                                          ➜ 37.6 MB
+cargo build -p app (release, nightly)              ✅ 成功 (26.3 MB)
+  + llvm-strip                                          ➜ 16.8 MB ✅ 推荐
 cargo build --release -p findex (legacy egui)      ✅ 成功 (5.5 MB)
 ```
 
@@ -35,10 +34,10 @@ cargo build --release -p findex (legacy egui)      ✅ 成功 (5.5 MB)
 - Tauri: v2.11.3
 - 注意: `windres` 不可用，资源编译跳过（exe 无图标，功能正常）
 
-#### 已知构建问题
-- **❌ Release 构建（Tauri v2）**: rustc ICE — ar_archive_writer 在 rust-lld + windows-sys 大特性集下溢出
-  - 临时方案：使用 cargo build -p app Debug 构建
-  - 修复方案：切换到 x86_64-pc-windows-msvc 工具链（需要 VS Build Tools 2022）
+#### 构建说明
+- Release 需要 nightly 工具链（stable 1.97.1 的 ar_archive_writer 仍有 u32 PosOverflow bug）
+- 推荐方式：`cargo +nightly-x86_64-pc-windows-gnu build --release -p app`
+- 最终 pp-stripped.exe 由 release 构建 + llvm-strip 得到 16.8 MB
 
 ---
 
@@ -73,7 +72,7 @@ findex help                  # 显示帮助
 
 | 版本 | 亮点 |
 |------|------|
-| **v0.3.0** | ✅ **Tauri v2 迁移 — [app-stripped.exe](https://github.com/ZackAstra/Findex/releases/download/v0.3.0/app-stripped.exe) (37.6 MB)** |
+| **v0.3.0** | ✅ **Tauri v2 迁移 — [app-stripped.exe](https://github.com/ZackAstra/Findex/releases/download/v0.3.0/app-stripped.exe) (16.8 MB)** |
 | v0.2.2 | 设置窗口 UI 重构 (codex-bridge 风格) |
 | v0.2.1 | USN Journal 增量索引 + 权限管理 |
 | v0.2.0 | USN Journal 引擎 |
